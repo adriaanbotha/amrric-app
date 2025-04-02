@@ -15,44 +15,23 @@ class AuthService {
   bool get isAuthenticated => _currentUser != null;
 
   Future<bool> login(String email, String password) async {
-    try {
-      // Check if user exists
-      final userKey = 'user:$email';
-      final userData = await _redis.get(userKey);
-      
-      if (userData == null) {
-        throw Exception('User not found');
-      }
-
-      // Check password (for testing, password is same as email)
-      final storedPassword = await _redis.get('password:$email');
-      if (storedPassword != password) {
-        throw Exception('Invalid password');
-      }
-
-      final user = User.fromJson(userData);
-      if (!user.isActive) {
-        throw Exception('User account is inactive');
-      }
-
-      // Generate and store token
-      _authToken = 'token_${DateTime.now().millisecondsSinceEpoch}';
-      await _redis.set('token:$_authToken', user.toJson());
-
-      _currentUser = user;
-      return true;
-    } catch (e) {
-      print('Login error: $e');
-      return false;
+    final userJson = await _redis.get('user:$email');
+    if (userJson == null) {
+      throw Exception('User not found');
     }
+
+    final storedPassword = await _redis.get('password:$email');
+    if (storedPassword != password) {
+      throw Exception('Invalid password');
+    }
+
+    final user = User.fromJson(userJson);
+    _currentUser = user;
+    return true;
   }
 
   Future<void> logout() async {
-    if (_authToken != null) {
-      await _redis.del(['token:$_authToken']);
-    }
     _currentUser = null;
-    _authToken = null;
   }
 
   Future<bool> checkAuth() async {
@@ -82,6 +61,56 @@ class AuthService {
       case UserRole.normal:
         return permission.startsWith('census:');
     }
+  }
+
+  Future<List<User>> getAllUsers() async {
+    final keys = await _redis.keys('user:*');
+    final users = <User>[];
+    
+    for (final key in keys) {
+      final userJson = await _redis.get(key);
+      if (userJson != null) {
+        users.add(User.fromJson(userJson));
+      }
+    }
+    
+    return users;
+  }
+
+  Future<void> deleteUser(String email) async {
+    await _redis.del(['user:$email', 'password:$email']);
+  }
+
+  Future<void> createUser({
+    required String email,
+    required String password,
+    required String name,
+    required UserRole role,
+  }) async {
+    final userExists = await _redis.get('user:$email');
+    if (userExists != null) {
+      throw Exception('User already exists');
+    }
+
+    final user = User(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      email: email,
+      name: name,
+      role: role,
+      lastLogin: DateTime.now(),
+      isActive: true,
+    );
+
+    await _redis.set('user:$email', user.toJson());
+    await _redis.set('password:$email', password);
+  }
+
+  Future<void> updateUser(User user) async {
+    await _redis.set('user:${user.email}', user.toJson());
+  }
+
+  Future<void> updatePassword(String email, String newPassword) async {
+    await _redis.set('password:$email', newPassword);
   }
 }
 

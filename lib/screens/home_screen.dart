@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/screens/login_screen.dart';
+import 'package:amrric_app/screens/admin/user_management_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -68,6 +69,20 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            if (user.role == UserRole.systemAdmin) ...[
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: const Text('User Management'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const UserManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
@@ -112,7 +127,11 @@ class HomeScreen extends ConsumerWidget {
           'User Management',
           Icons.people,
           () {
-            // Navigate to user management
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const UserManagementScreen(),
+              ),
+            );
           },
         ),
         _buildFeatureCard(
