@@ -4,6 +4,7 @@ import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/screens/login_screen.dart';
 import 'package:amrric_app/screens/admin/user_management_screen.dart';
+import 'package:amrric_app/screens/admin/system_settings_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -137,9 +138,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'System Settings',
           Icons.settings,
-          () {
-            // TODO: Implement system settings
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SystemSettingsScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,
