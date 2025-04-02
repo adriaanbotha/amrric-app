@@ -1,77 +1,93 @@
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 
 class Council {
   final String id;
   final String name;
   final String state;
-  final String imageUrl;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? imageUrl;
 
   Council({
     required this.id,
     required this.name,
     required this.state,
-    required this.imageUrl,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
+    this.imageUrl,
   });
 
-  factory Council.fromMap(Map<String, dynamic> map) {
-    bool parseIsActive(dynamic value) {
-      if (value is bool) return value;
-      if (value is String) return value.toLowerCase() == 'true';
-      return false;
-    }
-
+  factory Council.create() {
+    final now = DateTime.now();
     return Council(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      state: map['state'] as String,
-      imageUrl: map['imageUrl'] as String,
-      isActive: parseIsActive(map['isActive']),
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      updatedAt: DateTime.parse(map['updatedAt'] as String),
+      id: const Uuid().v4(),
+      name: '',
+      state: '',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
     );
-  }
-
-  Map<String, String> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'state': state,
-      'imageUrl': imageUrl,
-      'isActive': isActive.toString(),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
   }
 
   Council copyWith({
     String? id,
     String? name,
     String? state,
-    String? imageUrl,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? imageUrl,
   }) {
     return Council(
       id: id ?? this.id,
       name: name ?? this.name,
       state: state ?? this.state,
-      imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    debugPrint('Converting Council to JSON: $this');
+    return {
+      'id': id,
+      'name': name,
+      'state': state,
+      'isActive': isActive.toString(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'imageUrl': imageUrl,
+    };
+  }
+
+  factory Council.fromJson(Map<String, dynamic> json) {
+    debugPrint('Creating Council from JSON: $json');
+    try {
+      return Council(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        state: json['state'] as String,
+        isActive: json['isActive'].toString().toLowerCase() == 'true',
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        updatedAt: DateTime.parse(json['updatedAt'] as String),
+        imageUrl: json['imageUrl'] as String?,
+      );
+    } catch (e, stack) {
+      debugPrint('Error creating Council from JSON: $e');
+      debugPrint('Stack trace: $stack');
+      rethrow;
+    }
   }
 
   @override
   String toString() {
-    return 'Council(id: $id, name: $name, state: $state, isActive: $isActive)';
+    return 'Council(id: $id, name: $name, state: $state, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt, imageUrl: $imageUrl)';
   }
 
   static const List<String> validStates = [
@@ -97,6 +113,9 @@ class Council {
   };
 
   bool validate() {
-    return name.isNotEmpty && validStates.contains(state);
+    if (name.isEmpty || name.length > 100) return false;
+    if (state.isEmpty || state.length > 50) return false;
+    if (!validStates.contains(state)) return false;
+    return true;
   }
 } 

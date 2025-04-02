@@ -1,139 +1,175 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/location.dart';
+import '../../models/location_type.dart';
+import '../../models/council.dart';
 import '../../services/location_service.dart';
-import '../../services/upstash_config.dart';
+import '../../services/council_service.dart';
 import '../../widgets/loading_indicator.dart';
+import '../../widgets/error_display.dart';
 
-class LocationManagementScreen extends StatefulWidget {
-  final String councilId;
-  final String councilName;
-
-  const LocationManagementScreen({
-    Key? key,
-    required this.councilId,
-    required this.councilName,
-  }) : super(key: key);
+class LocationManagementScreen extends ConsumerStatefulWidget {
+  const LocationManagementScreen({super.key});
 
   @override
-  State<LocationManagementScreen> createState() => _LocationManagementScreenState();
+  ConsumerState<LocationManagementScreen> createState() => _LocationManagementScreenState();
 }
 
-class _LocationManagementScreenState extends State<LocationManagementScreen> {
-  final _locationService = LocationService(UpstashConfig.redis);
-  final _searchController = TextEditingController();
-  bool _isLoading = false;
-  List<Location> _locations = [];
-  String _selectedType = '';
+class _LocationManagementScreenState extends ConsumerState<LocationManagementScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _altNameController = TextEditingController();
+  final _codeController = TextEditingController();
+  String? _selectedCouncilId;
+  LocationType? _selectedLocationType;
+  bool _useLotNumber = false;
+  bool _isActive = true;
+  String? _selectedFilter;
 
   @override
-  void initState() {
-    super.initState();
-    _loadLocations();
+  void dispose() {
+    _nameController.dispose();
+    _altNameController.dispose();
+    _codeController.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadLocations() async {
-    setState(() => _isLoading = true);
-    try {
-      final locations = await _locationService.getLocationsByCouncil(widget.councilId);
-      setState(() {
-        _locations = locations;
-        if (_selectedType.isNotEmpty) {
-          _locations = locations.where((l) => l.locationTypeId == _selectedType).toList();
-        }
-      });
-    } catch (e) {
-      _showError(e.toString());
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  void _resetForm() {
+    _nameController.clear();
+    _altNameController.clear();
+    _codeController.clear();
+    _selectedCouncilId = null;
+    _selectedLocationType = null;
+    _useLotNumber = false;
+    _isActive = true;
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+  void _showAddLocationDialog() {
+    _resetForm();
+    _showLocationDialog(isEdit: false);
   }
 
-  Future<void> _showAddEditLocationDialog([Location? location]) async {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: location?.name);
-    final altNameController = TextEditingController(text: location?.altName);
-    final codeController = TextEditingController(text: location?.code);
-    String selectedType = location?.locationTypeId ?? Location.validLocationTypes.first;
-    bool useLotNumber = location?.useLotNumber ?? false;
+  void _showEditLocationDialog(Location location) {
+    _nameController.text = location.name;
+    _altNameController.text = location.altName ?? '';
+    _codeController.text = location.code;
+    _selectedCouncilId = location.councilId;
+    _selectedLocationType = location.locationTypeId;
+    _useLotNumber = location.useLotNumber;
+    _isActive = location.isActive;
+    _showLocationDialog(isEdit: true, location: location);
+  }
 
-    await showDialog(
+  void _showLocationDialog({required bool isEdit, Location? location}) {
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(location == null ? 'Add Location' : 'Edit Location'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
+        title: Text(isEdit ? 'Edit Community' : 'Add New Community'),
+        content: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Community Name'),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Name is required';
+                      return 'Please enter a community name';
                     }
                     if (value.length > 100) {
-                      return 'Name must be 100 characters or less';
+                      return 'Community name must be less than 100 characters';
                     }
                     return null;
                   },
                 ),
                 TextFormField(
-                  controller: altNameController,
+                  controller: _altNameController,
                   decoration: const InputDecoration(labelText: 'Alternative Name (Optional)'),
-                  validator: (value) {
-                    if (value != null && value.length > 100) {
-                      return 'Alternative name must be 100 characters or less';
-                    }
-                    return null;
-                  },
                 ),
                 TextFormField(
-                  controller: codeController,
-                  decoration: const InputDecoration(labelText: 'Code'),
+                  controller: _codeController,
+                  decoration: const InputDecoration(labelText: 'Community Code'),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Code is required';
+                      return 'Please enter a community code';
                     }
-                    if (value.length > 20) {
-                      return 'Code must be 20 characters or less';
+                    if (value.length > 10) {
+                      return 'Community code must be less than 10 characters';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedType,
+                Consumer(
+                  builder: (context, ref, child) {
+                    final councilsAsync = ref.watch(councilsProvider);
+                    return councilsAsync.when(
+                      data: (councils) => DropdownButtonFormField<String>(
+                        value: _selectedCouncilId,
+                        decoration: const InputDecoration(labelText: 'Council'),
+                        items: councils.map((council) {
+                          return DropdownMenuItem(
+                            value: council.id,
+                            child: Text(council.name),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCouncilId = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a council';
+                          }
+                          return null;
+                        },
+                      ),
+                      loading: () => const CircularProgressIndicator(),
+                      error: (error, stack) => Text('Error loading councils: $error'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<LocationType>(
+                  value: _selectedLocationType,
                   decoration: const InputDecoration(labelText: 'Location Type'),
-                  items: Location.validLocationTypes.map((type) {
+                  items: LocationType.values.map((type) {
                     return DropdownMenuItem(
                       value: type,
-                      child: Text(Location.locationTypeNames[type] ?? type),
+                      child: Text(type.toString().split('.').last),
                     );
                   }).toList(),
                   onChanged: (value) {
-                    if (value != null) {
-                      selectedType = value;
+                    setState(() {
+                      _selectedLocationType = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Please select a location type';
                     }
+                    return null;
                   },
                 ),
-                const SizedBox(height: 16),
                 SwitchListTile(
-                  title: const Text('Use Lot Number for Addresses'),
-                  value: useLotNumber,
+                  title: const Text('Use Lot Numbers'),
+                  value: _useLotNumber,
                   onChanged: (value) {
-                    useLotNumber = value;
+                    setState(() {
+                      _useLotNumber = value;
+                    });
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Active'),
+                  value: _isActive,
+                  onChanged: (value) {
+                    setState(() {
+                      _isActive = value;
+                    });
                   },
                 ),
               ],
@@ -145,215 +181,231 @@ class _LocationManagementScreenState extends State<LocationManagementScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () async {
-              if (formKey.currentState!.validate()) {
+              if (_formKey.currentState!.validate()) {
+                final locationService = ref.read(locationsProvider.notifier);
+                final updatedLocation = Location.create().copyWith(
+                  id: isEdit ? location!.id : null,
+                  name: _nameController.text,
+                  altName: _altNameController.text.isEmpty ? null : _altNameController.text,
+                  code: _codeController.text,
+                  locationTypeId: _selectedLocationType!,
+                  councilId: _selectedCouncilId!,
+                  useLotNumber: _useLotNumber,
+                  isActive: _isActive,
+                  createdAt: isEdit ? location!.createdAt : null,
+                );
+
                 try {
-                  final now = DateTime.now();
-                  final newLocation = Location(
-                    id: location?.id ?? const Uuid().v4(),
-                    name: nameController.text,
-                    altName: altNameController.text.isEmpty ? null : altNameController.text,
-                    code: codeController.text,
-                    locationTypeId: selectedType,
-                    councilId: widget.councilId,
-                    useLotNumber: useLotNumber,
-                    createdAt: location?.createdAt ?? now,
-                    updatedAt: now,
-                  );
-
-                  if (location == null) {
-                    await _locationService.createLocation(newLocation);
+                  if (isEdit) {
+                    await locationService.updateLocation(updatedLocation);
                   } else {
-                    await _locationService.updateLocation(newLocation);
+                    await locationService.addLocation(updatedLocation);
                   }
-
+                  
                   if (mounted) {
                     Navigator.pop(context);
-                    _loadLocations();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEdit ? 'Community updated successfully' : 'Community added successfully'
+                        ),
+                      ),
+                    );
                   }
                 } catch (e) {
                   if (mounted) {
-                    _showError(e.toString());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEdit ? 'Error updating community: $e' : 'Error adding community: $e'
+                        ),
+                      ),
+                    );
                   }
                 }
               }
             },
-            child: Text(location == null ? 'Add' : 'Save'),
+            child: Text(isEdit ? 'Update' : 'Add'),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _confirmDelete(Location location) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Location'),
-        content: Text('Are you sure you want to delete ${location.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _locationService.deleteLocation(location.id);
-        _loadLocations();
-      } catch (e) {
-        _showError(e.toString());
-      }
-    }
-  }
-
-  Widget _buildTypeFilter() {
-    return DropdownButton<String>(
-      value: _selectedType.isEmpty ? null : _selectedType,
-      hint: const Text('Filter by Type'),
-      items: [
-        const DropdownMenuItem(
-          value: '',
-          child: Text('All Types'),
-        ),
-        ...Location.validLocationTypes.map((type) {
-          return DropdownMenuItem(
-            value: type,
-            child: Text(Location.locationTypeNames[type] ?? type),
-          );
-        }),
-      ],
-      onChanged: (value) {
-        setState(() {
-          _selectedType = value ?? '';
-          if (_selectedType.isEmpty) {
-            _loadLocations();
-          } else {
-            _locations = _locations.where((l) => l.locationTypeId == _selectedType).toList();
-          }
-        });
-      },
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          labelText: 'Search Locations',
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () async {
-              if (_searchController.text.isNotEmpty) {
-                setState(() => _isLoading = true);
-                try {
-                  final results = await _locationService.searchLocations(
-                    widget.councilId,
-                    _searchController.text,
-                  );
-                  setState(() {
-                    _locations = results;
-                    if (_selectedType.isNotEmpty) {
-                      _locations = results.where((l) => l.locationTypeId == _selectedType).toList();
-                    }
-                  });
-                } catch (e) {
-                  _showError(e.toString());
-                } finally {
-                  setState(() => _isLoading = false);
-                }
-              }
-            },
-          ),
-        ),
-        onSubmitted: (_) async {
-          if (_searchController.text.isNotEmpty) {
-            setState(() => _isLoading = true);
-            try {
-              final results = await _locationService.searchLocations(
-                widget.councilId,
-                _searchController.text,
-              );
-              setState(() {
-                _locations = results;
-                if (_selectedType.isNotEmpty) {
-                  _locations = results.where((l) => l.locationTypeId == _selectedType).toList();
-                }
-              });
-            } catch (e) {
-              _showError(e.toString());
-            } finally {
-              setState(() => _isLoading = false);
-            }
-          }
-        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final locationsAsync = ref.watch(locationsProvider);
+    final councilsAsync = ref.watch(councilsProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.councilName} - Locations'),
+        title: const Text('Community Management'),
+        centerTitle: true,
         actions: [
-          _buildTypeFilter(),
+          DropdownButton<String>(
+            value: _selectedFilter,
+            hint: const Text('Filter by Type'),
+            items: [
+              const DropdownMenuItem(
+                value: null,
+                child: Text('All Types'),
+              ),
+              ...LocationType.values.map((type) {
+                return DropdownMenuItem(
+                  value: type.toString(),
+                  child: Text(type.toString().split('.').last),
+                );
+              }).toList(),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedFilter = value;
+              });
+            },
+          ),
+          const SizedBox(width: 16),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          if (_isLoading)
-            const Expanded(child: LoadingIndicator())
-          else
-            Expanded(
-              child: ListView.builder(
-                itemCount: _locations.length,
-                itemBuilder: (context, index) {
-                  final location = _locations[index];
-                  return ListTile(
-                    title: Text(location.name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (location.altName != null) Text('Alt: ${location.altName}'),
-                        Text('Code: ${location.code}'),
-                        Text('Type: ${Location.locationTypeNames[location.locationTypeId]}'),
-                        Text('Use Lot Number: ${location.useLotNumber ? 'Yes' : 'No'}'),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _showAddEditLocationDialog(location),
+      body: locationsAsync.when(
+        data: (locations) => councilsAsync.when(
+          data: (councils) {
+            if (councils.isEmpty) {
+              return const Center(
+                child: Text('No councils found. Please add a council first.'),
+              );
+            }
+
+            // Filter locations based on selected type
+            final filteredLocations = _selectedFilter == null
+                ? locations
+                : locations.where((loc) => 
+                    loc.locationTypeId.toString() == _selectedFilter).toList();
+
+            // Group locations by council
+            final locationsByCouncil = <String, List<Location>>{};
+            for (final location in filteredLocations) {
+              final councilId = location.councilId;
+              if (!locationsByCouncil.containsKey(councilId)) {
+                locationsByCouncil[councilId] = [];
+              }
+              locationsByCouncil[councilId]!.add(location);
+            }
+
+            if (locationsByCouncil.isEmpty && _selectedFilter != null) {
+              return Center(
+                child: Text('No communities found for type: ${_selectedFilter!.split('.').last}'),
+              );
+            }
+
+            if (locationsByCouncil.isEmpty) {
+              return const Center(
+                child: Text('No communities found. Click the + button to add one.'),
+              );
+            }
+
+            return ListView.builder(
+              itemCount: councils.length,
+              itemBuilder: (context, index) {
+                final council = councils[index];
+                final councilLocations = locationsByCouncil[council.id] ?? [];
+
+                return ExpansionTile(
+                  title: Text(council.name),
+                  subtitle: Text('${councilLocations.length} communities'),
+                  children: councilLocations.map((location) {
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: ListTile(
+                        title: Text(location.name),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (location.altName != null)
+                              Text('Also known as: ${location.altName}'),
+                            Text('Type: ${location.locationTypeId.toString().split('.').last}'),
+                            Text('Code: ${location.code}'),
+                            Text('Lot Numbers: ${location.useLotNumber ? 'Yes' : 'No'}'),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _confirmDelete(location),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showEditLocationDialog(location),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Community'),
+                                    content: Text(
+                                      'Are you sure you want to delete ${location.name}?'
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirmed == true) {
+                                  try {
+                                    await ref.read(locationsProvider.notifier)
+                                        .deleteLocation(location.id);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Community deleted successfully'),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error deleting community: $e'),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Text('Error loading councils: $error'),
+          ),
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Text('Error loading locations: $error'),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddEditLocationDialog(),
+        onPressed: _showAddLocationDialog,
         child: const Icon(Icons.add),
       ),
     );

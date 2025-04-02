@@ -7,6 +7,8 @@ import 'package:amrric_app/screens/admin/user_management_screen.dart';
 import 'package:amrric_app/screens/admin/system_settings_screen.dart';
 import 'package:amrric_app/screens/reports_screen.dart';
 import 'package:amrric_app/screens/admin/council_management_screen.dart';
+import 'package:amrric_app/screens/profile_screen.dart';
+import 'package:amrric_app/screens/admin/location_management_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -33,69 +35,115 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 30,
-                    child: Text(
-                      user.name[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    user.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    user.email,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+            UserAccountsDrawerHeader(
+              accountName: Text(user.name),
+              accountEmail: Text(user.email),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Text(
+                  user.name[0].toUpperCase(),
+                  style: const TextStyle(fontSize: 24),
+                ),
               ),
             ),
+            // Profile Section
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            // Admin Section
             if (user.role == UserRole.systemAdmin) ...[
               ListTile(
-                leading: const Icon(Icons.people),
+                leading: const Icon(Icons.admin_panel_settings),
                 title: const Text('User Management'),
                 onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
                     MaterialPageRoute(
                       builder: (context) => const UserManagementScreen(),
                     ),
                   );
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.business),
+                title: const Text('Council Management'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CouncilManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_city),
+                title: const Text('Community Management'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LocationManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('System Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SystemSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
             ],
+            // Reports Section
+            ListTile(
+              leading: const Icon(Icons.bar_chart),
+              title: const Text('Reports'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            // Logout
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: () async {
                 await authService.logout();
-                ref.read(authStateProvider.notifier).state = null;
                 if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    (route) => false,
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
                   );
                 }
               },
@@ -160,7 +208,7 @@ class HomeScreen extends ConsumerWidget {
         ),
         _buildMenuCard(
           context,
-          'Municipality Data',
+          'Council Management',
           Icons.location_city,
           () => Navigator.push(
             context,
@@ -180,7 +228,7 @@ class HomeScreen extends ConsumerWidget {
       children: [
         _buildMenuCard(
           context,
-          'Municipality Data',
+          'Council Data',
           Icons.location_city,
           () => Navigator.push(
             context,

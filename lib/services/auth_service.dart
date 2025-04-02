@@ -211,6 +211,7 @@ class AuthService {
   }
 
   Future<void> updatePassword(String email, String newPassword) async {
+    debugPrint('Updating password for user: $email');
     final userJson = await _redis.hgetall('user:$email');
     if (userJson != null && userJson.isNotEmpty) {
       final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
@@ -228,6 +229,15 @@ class AuthService {
       await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
     }
     await _redis.set('password:$email', newPassword);
+    debugPrint('Password updated successfully for user: $email');
+  }
+
+  Future<bool> verifyPassword(String email, String password) async {
+    debugPrint('Verifying password for user: $email');
+    final storedPassword = await _redis.get('password:$email');
+    final isValid = storedPassword == password;
+    debugPrint('Password verification result: $isValid');
+    return isValid;
   }
 
   Future<void> toggleUserStatus(String email, bool isActive) async {
