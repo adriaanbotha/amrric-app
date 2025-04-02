@@ -52,16 +52,18 @@ class User {
     // Parse activity log
     List<Map<String, dynamic>> parseActivityLog(dynamic value) {
       try {
-        if (value is List) {
-          return value.map((e) => Map<String, dynamic>.from(e)).toList();
-        }
+        if (value == null || value == '') return [];
+        
         if (value is String) {
           final decoded = jsonDecode(value);
           if (decoded is List) {
-            return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+            return List<Map<String, dynamic>>.from(
+              decoded.map((e) => Map<String, dynamic>.from(e))
+            );
           }
         }
-        debugPrint('Failed to parse activity log: $value');
+        
+        debugPrint('Failed to parse activity log, returning empty list: $value');
         return [];
       } catch (e) {
         debugPrint('Error parsing activity log: $e');
@@ -103,7 +105,7 @@ class User {
       'lastLogin': lastLogin.toIso8601String(),
       'isActive': isActive.toString(),
       'loginAttempts': loginAttempts.toString(),
-      'activityLog': activityLog,
+      'activityLog': jsonEncode(activityLog),
     };
     debugPrint('Converting User to JSON: $json');
     return json;

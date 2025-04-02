@@ -1,85 +1,119 @@
 import 'package:flutter/material.dart';
-import 'package:upstash_redis/upstash_redis.dart';
-import '../../models/council.dart';
-import '../../services/council_service.dart';
-import '../../services/upstash_config.dart';
-import 'location_management_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:amrric_app/models/council.dart';
+import 'package:amrric_app/services/council_service.dart';
 
-class CouncilManagementScreen extends StatefulWidget {
-  const CouncilManagementScreen({Key? key}) : super(key: key);
+class CouncilManagementScreen extends ConsumerStatefulWidget {
+  const CouncilManagementScreen({super.key});
 
   @override
-  _CouncilManagementScreenState createState() => _CouncilManagementScreenState();
+  ConsumerState<CouncilManagementScreen> createState() => _CouncilManagementScreenState();
 }
 
-class _CouncilManagementScreenState extends State<CouncilManagementScreen> {
-  final _councilService = CouncilService(UpstashConfig.redis);
-  final _searchController = TextEditingController();
-  bool _isLoading = false;
-  List<Council> _councils = [];
-  String _selectedState = '';
+class _CouncilManagementScreenState extends ConsumerState<CouncilManagementScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  bool _isActive = true;
 
   @override
-  void initState() {
-    super.initState();
-    _loadCouncils();
+  void dispose() {
+    _nameController.dispose();
+    _stateController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadCouncils() async {
-    setState(() => _isLoading = true);
-    try {
-      final councils = await _councilService.getCouncils();
-      setState(() => _councils = councils);
-    } catch (e) {
-      _showError(e.toString());
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  void _resetForm() {
+    _nameController.clear();
+    _stateController.clear();
+    _imageUrlController.clear();
+    _isActive = true;
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  void _showAddCouncilDialog() {
+    _resetForm();
+    _showCouncilDialog(isEdit: false);
   }
 
-  Future<void> _showAddEditCouncilDialog({Council? council}) async {
-    final nameController = TextEditingController(text: council?.name);
-    final stateController = TextEditingController(text: council?.state);
-    final imageUrlController = TextEditingController(text: council?.imageUrl);
+  void _showEditCouncilDialog(Council council) {
+    _nameController.text = council.name;
+    _stateController.text = council.state;
+    _imageUrlController.text = council.imageUrl ?? '';
+    _isActive = council.isActive;
+    _showCouncilDialog(isEdit: true, council: council);
+  }
 
-    final result = await showDialog<Council>(
+  void _showCouncilDialog({required bool isEdit, Council? council}) {
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(council == null ? 'Add Council' : 'Edit Council'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a name';
-                }
-                return null;
-              },
-            ),
-            TextFormField(
-              controller: stateController,
-              decoration: const InputDecoration(labelText: 'State'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a state';
-                }
-                return null;
-              },
-            ),
-            TextFormField(
-              controller: imageUrlController,
-              decoration: const InputDecoration(labelText: 'Image URL'),
-            ),
-          ],
+        title: Text(isEdit ? 'Edit Council' : 'Add New Council'),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Council Name'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a council name';
+                  }
+                  if (value.length > 100) {
+                    return 'Council name must be less than 100 characters';
+                  }
+                  return null;
+                },
+              ),
+              DropdownButtonFormField<String>(
+                value: _stateController.text.isEmpty ? null : _stateController.text,
+                decoration: const InputDecoration(labelText: 'State'),
+                items: Council.validStates.map((state) {
+                  return DropdownMenuItem(
+                    value: state,
+                    child: Text('${state} - ${Council.stateNames[state]}'),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    _stateController.text = value;
+                  }
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a state';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _imageUrlController,
+                decoration: const InputDecoration(labelText: 'Image URL'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter an image URL';
+                  }
+                  final uri = Uri.tryParse(value);
+                  if (uri == null || !uri.hasAbsolutePath) {
+                    return 'Please enter a valid URL';
+                  }
+                  return null;
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Active'),
+                value: _isActive,
+                onChanged: (value) {
+                  setState(() {
+                    _isActive = value;
+                  });
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -87,134 +121,137 @@ class _CouncilManagementScreenState extends State<CouncilManagementScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              if (nameController.text.isEmpty || stateController.text.isEmpty) {
-                _showError('Please fill in all required fields');
-                return;
+            onPressed: () async {
+              if (_formKey.currentState!.validate()) {
+                final updatedCouncil = Council(
+                  id: isEdit ? council!.id : DateTime.now().millisecondsSinceEpoch.toString(),
+                  name: _nameController.text,
+                  state: _stateController.text,
+                  imageUrl: _imageUrlController.text,
+                  isActive: _isActive,
+                  createdAt: isEdit ? council!.createdAt : DateTime.now(),
+                  updatedAt: DateTime.now(),
+                );
+
+                try {
+                  if (isEdit) {
+                    await ref.read(councilsProvider.notifier).updateCouncil(updatedCouncil);
+                  } else {
+                    await ref.read(councilsProvider.notifier).addCouncil(updatedCouncil);
+                  }
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isEdit ? 'Council updated successfully' : 'Council added successfully'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isEdit ? 'Error updating council: $e' : 'Error adding council: $e')),
+                    );
+                  }
+                }
               }
-              final updatedCouncil = Council(
-                id: council?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                name: nameController.text,
-                state: stateController.text,
-                imageUrl: imageUrlController.text,
-                isActive: council?.isActive ?? true,
-                createdAt: council?.createdAt ?? DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-              Navigator.pop(context, updatedCouncil);
             },
-            child: const Text('Save'),
+            child: Text(isEdit ? 'Update' : 'Add'),
           ),
         ],
       ),
-    );
-
-    if (result != null) {
-      try {
-        if (council == null) {
-          await _councilService.createCouncil(result);
-        } else {
-          await _councilService.updateCouncil(result);
-        }
-        _loadCouncils();
-      } catch (e) {
-        _showError(e.toString());
-      }
-    }
-  }
-
-  Future<void> _confirmDelete(Council council) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Council'),
-        content: Text('Are you sure you want to delete ${council.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      try {
-        await _councilService.deleteCouncil(council.id);
-        _loadCouncils();
-      } catch (e) {
-        _showError(e.toString());
-      }
-    }
-  }
-
-  Widget _buildCouncilList() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_councils.isEmpty) {
-      return const Center(child: Text('No councils found'));
-    }
-
-    return ListView.builder(
-      itemCount: _councils.length,
-      itemBuilder: (context, index) {
-        final council = _councils[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundImage: council.imageUrl != null
-                ? NetworkImage(council.imageUrl!)
-                : null,
-            child: council.imageUrl == null
-                ? const Icon(Icons.account_balance)
-                : null,
-          ),
-          title: Text(council.name),
-          subtitle: Text('${council.state} - ${council.isActive ? 'Active' : 'Inactive'}'),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.location_city),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LocationManagementScreen(
-                      councilId: council.id,
-                      councilName: council.name,
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () => _showAddEditCouncilDialog(council: council),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () => _confirmDelete(council),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final councilsAsync = ref.watch(councilsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Council Management'),
+        centerTitle: true,
       ),
-      body: _buildCouncilList(),
+      body: councilsAsync.when(
+        data: (councils) => councils.isEmpty
+            ? const Center(child: Text('No councils found'))
+            : ListView.builder(
+                itemCount: councils.length,
+                itemBuilder: (context, index) {
+                  final council = councils[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: council.imageUrl != null
+                            ? NetworkImage(council.imageUrl!)
+                            : null,
+                        child: council.imageUrl == null
+                            ? const Icon(Icons.business)
+                            : null,
+                      ),
+                      title: Text(council.name),
+                      subtitle: Text('${council.state} - ${council.isActive ? 'Active' : 'Inactive'}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _showEditCouncilDialog(council),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Delete Council'),
+                                  content: Text('Are you sure you want to delete ${council.name}?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirmed == true) {
+                                try {
+                                  await ref.read(councilsProvider.notifier).deleteCouncil(council.id);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Council deleted successfully')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error deleting council: $e')),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Text('Error loading councils: $error'),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddEditCouncilDialog(),
+        onPressed: _showAddCouncilDialog,
         child: const Icon(Icons.add),
       ),
     );
