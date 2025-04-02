@@ -4,22 +4,50 @@ class Council {
   final String id;
   final String name;
   final String state;
-  final String? imageUrl;
+  final String imageUrl;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final Map<String, dynamic>? configuration;
 
   Council({
     required this.id,
     required this.name,
     required this.state,
-    this.imageUrl,
-    this.isActive = true,
+    required this.imageUrl,
+    required this.isActive,
     required this.createdAt,
     required this.updatedAt,
-    this.configuration,
   });
+
+  factory Council.fromMap(Map<String, dynamic> map) {
+    bool parseIsActive(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      return false;
+    }
+
+    return Council(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      state: map['state'] as String,
+      imageUrl: map['imageUrl'] as String,
+      isActive: parseIsActive(map['isActive']),
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: DateTime.parse(map['updatedAt'] as String),
+    );
+  }
+
+  Map<String, String> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'state': state,
+      'imageUrl': imageUrl,
+      'isActive': isActive.toString(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
 
   Council copyWith({
     String? id,
@@ -29,7 +57,6 @@ class Council {
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
-    Map<String, dynamic>? configuration,
   }) {
     return Council(
       id: id ?? this.id,
@@ -39,33 +66,6 @@ class Council {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      configuration: configuration ?? this.configuration,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'state': state,
-      'imageUrl': imageUrl,
-      'isActive': isActive,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-      'configuration': configuration,
-    };
-  }
-
-  factory Council.fromJson(Map<String, dynamic> json) {
-    return Council(
-      id: json['id'],
-      name: json['name'],
-      state: json['state'],
-      imageUrl: json['imageUrl'],
-      isActive: json['isActive'] ?? true,
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
-      configuration: json['configuration'],
     );
   }
 

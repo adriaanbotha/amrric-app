@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/models/council.dart';
+import 'package:upstash_redis/upstash_redis.dart';
 
 Future<void> createTestData() async {
   debugPrint('Starting test data creation...');
@@ -116,59 +117,81 @@ Future<void> createTestUsers() async {
 }
 
 Future<void> createTestCouncils() async {
-  debugPrint('Creating test councils...');
-  final councils = [
-    {
-      'id': '1',
-      'name': 'Darwin City Council',
-      'state': 'NT',
-      'imageUrl': null,
-      'isActive': true,
-      'createdAt': DateTime.now(),
-      'updatedAt': DateTime.now(),
-    },
-    {
-      'id': '2',
-      'name': 'Alice Springs Town Council',
-      'state': 'NT',
-      'imageUrl': null,
-      'isActive': true,
-      'createdAt': DateTime.now(),
-      'updatedAt': DateTime.now(),
-    },
-    {
-      'id': '3',
-      'name': 'Katherine Town Council',
-      'state': 'NT',
-      'imageUrl': null,
-      'isActive': true,
-      'createdAt': DateTime.now(),
-      'updatedAt': DateTime.now(),
-    },
-  ];
+  try {
+    final redis = UpstashConfig.redis;
+    
+    // Create test councils
+    final testCouncils = [
+      {
+        'id': 'council1',
+        'name': 'Sydney City Council',
+        'state': 'NSW',
+        'imageUrl': 'https://example.com/sydney.jpg',
+        'isActive': 'true',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'council2',
+        'name': 'Melbourne City Council',
+        'state': 'VIC',
+        'imageUrl': 'https://example.com/melbourne.jpg',
+        'isActive': 'true',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'council3',
+        'name': 'Darwin City Council',
+        'state': 'NT',
+        'imageUrl': 'https://example.com/darwin.jpg',
+        'isActive': 'true',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    ];
 
-  for (final council in councils) {
-    debugPrint('Creating council: ${council['name']}');
-    final councilData = Council(
-      id: council['id'] as String,
-      name: council['name'] as String,
-      state: council['state'] as String,
-      imageUrl: council['imageUrl'] as String?,
-      isActive: council['isActive'] as bool,
-      createdAt: council['createdAt'] as DateTime,
-      updatedAt: council['updatedAt'] as DateTime,
-    ).toJson();
-    
-    debugPrint('Council data to store: $councilData');
-    final redisData = councilData.map((key, value) => MapEntry(key, value?.toString() ?? ''));
-    debugPrint('Redis data to store: $redisData');
-    
-    await UpstashConfig.redis.hset(
-      'council:${council['id']}',
-      redisData,
-    );
-    debugPrint('Council ${council['name']} created successfully');
+    // Clear existing councils
+    final existingKeys = await redis.keys('council:*');
+    if (existingKeys.isNotEmpty) {
+      await redis.del(existingKeys);
+    }
+
+    // Add new councils
+    for (final council in testCouncils) {
+      await redis.hset('council:${council['id']}', council);
+      debugPrint('Created council: ${council['name']}');
+    }
+
+    debugPrint('All test councils created successfully');
+  } catch (e) {
+    debugPrint('Error creating test data: $e');
+  }
+}
+
+class TestData {
+  static Map<String, String> getTestCouncil() {
+    return {
+      'id': 'test1',
+      'name': 'Test Council',
+      'state': 'NSW',
+      'imageUrl': 'https://example.com/image.jpg',
+      'isActive': 'true',
+      'createdAt': DateTime.now().toIso8601String(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
   }
 
-  debugPrint('All test councils created successfully');
+  static Council createTestCouncil() {
+    final data = getTestCouncil();
+    return Council(
+      id: data['id']!,
+      name: data['name']!,
+      state: data['state']!,
+      imageUrl: data['imageUrl']!,
+      isActive: data['isActive']!.toLowerCase() == 'true',
+      createdAt: DateTime.parse(data['createdAt']!),
+      updatedAt: DateTime.parse(data['updatedAt']!),
+    );
+  }
 } 

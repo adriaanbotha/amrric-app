@@ -1,115 +1,89 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:upstash_redis/upstash_redis.dart';
-import 'package:amrric_app/models/council.dart';
-import 'package:amrric_app/config/upstash_config.dart';
+import '../models/council.dart';
+import '../config/upstash_config.dart';
 
-class CouncilService {
-  final Redis _redis;
+final councilsProvider = StateNotifierProvider<CouncilService, AsyncValue<List<Council>>>((ref) {
+  return CouncilService();
+});
 
-  CouncilService(this._redis);
+class CouncilService extends StateNotifier<AsyncValue<List<Council>>> {
+  final Redis _redis = UpstashConfig.redis;
 
-  // Create a new council
-  Future<Council> createCouncil(Council council) async {
-    if (!council.validate()) {
-      throw Exception('Invalid council data');
-    }
-
-    // Check if name is unique
-    final existingCouncils = await getCouncils();
-    if (existingCouncils.any((c) => c.name == council.name)) {
-      throw Exception('Council name must be unique');
-    }
-
-    // Store council
-    final councilData = council.toJson();
-    await _redis.hset(
-      'council:${council.id}',
-      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
-    );
-
-    return council;
+  CouncilService() : super(const AsyncValue.loading()) {
+    loadCouncils();
   }
 
-  // Get a council by ID
-  Future<Council?> getCouncil(String id) async {
-    final data = await _redis.hgetall('council:$id');
-    if (data == null || data.isEmpty) return null;
-    return Council.fromJson(data);
+  Future<void> loadCouncils() async {
+    try {
+      state = const AsyncValue.loading();
+      final councils = await getCouncils();
+      state = AsyncValue.data(councils);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
   }
 
-  // Get all councils
-  Future<List<Council>> getCouncils() async {
-    final keys = await _redis.keys('council:*');
-    final councils = <Council>[];
-
-    for (final key in keys) {
-      final data = await _redis.hgetall(key);
-      if (data != null && data.isNotEmpty) {
-        councils.add(Council.fromJson(data));
-      }
+  Future<void> addCouncil(Council council) async {
+    try {
+      final data = council.toMap();
+      await _redis.hset('council:${council.id}', data);
+      await loadCouncils();
+    } catch (e) {
+      print('Error adding council: $e');
+      rethrow;
     }
-
-    return councils;
   }
 
-  // Get councils by state
-  Future<List<Council>> getCouncilsByState(String state) async {
-    final councilIds = await _redis.smembers('councils:state:$state');
-    final councils = <Council>[];
-
-    for (final id in councilIds) {
-      final council = await getCouncil(id);
-      if (council != null) {
-        councils.add(council);
-      }
+  Future<void> updateCouncil(Council council) async {
+    try {
+      final data = council.toMap();
+      await _redis.hset('council:${council.id}', data);
+      await loadCouncils();
+    } catch (e) {
+      print('Error updating council: $e');
+      rethrow;
     }
-
-    return councils;
   }
 
-  // Update a council
-  Future<Council> updateCouncil(Council council) async {
-    if (!council.validate()) {
-      throw Exception('Invalid council data');
-    }
-
-    final existingCouncil = await getCouncil(council.id);
-    if (existingCouncil == null) {
-      throw Exception('Council not found');
-    }
-
-    // Check if name is unique if changed
-    if (existingCouncil.name != council.name) {
-      final existingCouncils = await getCouncils();
-      if (existingCouncils.any((c) => c.name == council.name)) {
-        throw Exception('Council name must be unique');
-      }
-    }
-
-    // Update council
-    final councilData = council.toJson();
-    await _redis.hset(
-      'council:${council.id}',
-      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
-    );
-
-    return council;
-  }
-
-  // Delete a council
   Future<void> deleteCouncil(String id) async {
-    final council = await getCouncil(id);
-    if (council == null) {
-      throw Exception('Council not found');
+    try {
+      await _redis.del(['council:$id']);
+      await loadCouncils();
+    } catch (e) {
+      print('Error deleting council: $e');
+      rethrow;
     }
+  }
 
-    // Check if council has associated locations
-    final locationCount = await _redis.scard('council:$id:locations');
-    if (locationCount > 0) {
-      throw Exception('Cannot delete council with associated locations');
+  Future<List<Council>> getCouncils() async {
+    try {
+      final keys = await _redis.keys('council:*');
+      final councils = <Council>[];
+
+      for (final key in keys) {
+        final data = await _redis.hgetall(key);
+        if (data != null && data.isNotEmpty) {
+          councils.add(Council.fromMap(data));
+        }
+      }
+
+      return councils;
+    } catch (e) {
+      print('Error getting councils: $e');
+      rethrow;
     }
+  }
 
-    // Delete council
-    await _redis.del(['council:$id']);
+  Future<Council?> getCouncil(String id) async {
+    try {
+      final data = await _redis.hgetall('council:$id');
+      if (data == null || data.isEmpty) return null;
+      return Council.fromMap(data);
+    } catch (e) {
+      print('Error getting council: $e');
+      rethrow;
+    }
   }
 
   // Search councils by name
@@ -136,45 +110,5 @@ class CouncilService {
     );
 
     await updateCouncil(updatedCouncil);
-  }
-
-  // Update council image
-  Future<Council> updateCouncilImage(String id, String imageUrl) async {
-    final council = await getCouncil(id);
-    if (council == null) {
-      throw Exception('Council not found');
-    }
-
-    final updatedCouncil = council.copyWith(
-      imageUrl: imageUrl,
-      updatedAt: DateTime.now(),
-    );
-
-    final councilData = updatedCouncil.toJson();
-    await _redis.hset(
-      'council:${updatedCouncil.id}',
-      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
-    );
-    return updatedCouncil;
-  }
-
-  // Update council configuration
-  Future<Council> updateCouncilConfiguration(String id, Map<String, dynamic> configuration) async {
-    final council = await getCouncil(id);
-    if (council == null) {
-      throw Exception('Council not found');
-    }
-
-    final updatedCouncil = council.copyWith(
-      configuration: configuration,
-      updatedAt: DateTime.now(),
-    );
-
-    final councilData = updatedCouncil.toJson();
-    await _redis.hset(
-      'council:${updatedCouncil.id}',
-      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
-    );
-    return updatedCouncil;
   }
 } 
