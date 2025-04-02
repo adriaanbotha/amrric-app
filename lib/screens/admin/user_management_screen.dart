@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/services/auth_service.dart';
+import 'package:amrric_app/config/upstash_config.dart';
 
 class UserManagementScreen extends ConsumerStatefulWidget {
   const UserManagementScreen({super.key});
@@ -15,7 +16,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   final _formKey = GlobalKey<FormState>();
   String _searchQuery = '';
   UserRole? _selectedRole;
-  bool _isLoading = false;
+  bool _isLoading = true;
   List<User> _users = [];
 
   @override
@@ -35,16 +36,16 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     try {
       final authService = ref.read(authServiceProvider);
       final users = await authService.getAllUsers();
-      setState(() => _users = users);
+      setState(() {
+        _users = users;
+        _isLoading = false;
+      });
     } catch (e) {
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading users: ${e.toString()}')),
+          SnackBar(content: Text('Error loading users: $e')),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
@@ -377,6 +378,57 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     }
   }
 
+  Future<void> _showUserActivityDialog(User user) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${user.name}\'s Activity Log'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: user.activityLog.length,
+            itemBuilder: (context, index) {
+              final activity = user.activityLog[index];
+              return ListTile(
+                title: Text(activity['action'] as String),
+                subtitle: Text(activity['details'] as String),
+                trailing: Text(
+                  DateTime.parse(activity['timestamp'] as String)
+                      .toString()
+                      .split('.')[0],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleUserStatus(User user) async {
+    try {
+      await ref.read(authServiceProvider).toggleUserStatus(user.email, !user.isActive);
+      _loadUsers();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'User ${user.isActive ? 'deactivated' : 'activated'} successfully'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating user status: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -440,29 +492,61 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                         itemCount: _filteredUsers.length,
                         itemBuilder: (context, index) {
                           final user = _filteredUsers[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              child: Text(user.name[0].toUpperCase()),
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                            title: Text(user.name),
-                            subtitle: Text(user.email),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Chip(
-                                  label: Text(
-                                    user.role.toString().split('.').last,
+                            child: ListTile(
+                              title: Text(user.name),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(user.email),
+                                  Text('Role: ${user.role.toString().split('.').last}'),
+                                  Text(
+                                      'Last Login: ${user.lastLogin.toString().split('.')[0]}'),
+                                  Text('Login Attempts: ${user.loginAttempts}'),
+                                  Text(
+                                    'Status: ${user.isActive ? 'Active' : 'Inactive'}',
+                                    style: TextStyle(
+                                      color: user.isActive ? Colors.green : Colors.red,
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () => _showEditUserDialog(user),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  onPressed: () => _deleteUser(user),
-                                ),
-                              ],
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.history),
+                                    onPressed: () => _showUserActivityDialog(user),
+                                    tooltip: 'View Activity',
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      user.isActive
+                                          ? Icons.toggle_on
+                                          : Icons.toggle_off,
+                                      color: user.isActive ? Colors.green : Colors.red,
+                                    ),
+                                    onPressed: () => _toggleUserStatus(user),
+                                    tooltip: user.isActive
+                                        ? 'Deactivate User'
+                                        : 'Activate User',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () => _showEditUserDialog(user),
+                                    tooltip: 'Edit User',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () => _deleteUser(user),
+                                    tooltip: 'Delete User',
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },

@@ -22,15 +22,61 @@ class AuthService {
 
     final storedPassword = await _redis.get('password:$email');
     if (storedPassword != password) {
+      // Increment login attempts
+      final user = User.fromJson(userJson);
+      final updatedUser = user.copyWith(
+        loginAttempts: user.loginAttempts + 1,
+        activityLog: [
+          ...user.activityLog,
+          {
+            'timestamp': DateTime.now().toIso8601String(),
+            'action': 'login_failed',
+            'details': 'Invalid password attempt',
+          },
+        ],
+      );
+      await _redis.set('user:$email', updatedUser.toJson());
       throw Exception('Invalid password');
     }
 
     final user = User.fromJson(userJson);
-    _currentUser = user;
+    if (!user.isActive) {
+      throw Exception('User account is inactive');
+    }
+
+    // Reset login attempts and update last login
+    final updatedUser = user.copyWith(
+      loginAttempts: 0,
+      lastLogin: DateTime.now(),
+      activityLog: [
+        ...user.activityLog,
+        {
+          'timestamp': DateTime.now().toIso8601String(),
+          'action': 'login_success',
+          'details': 'Successful login',
+        },
+      ],
+    );
+    await _redis.set('user:$email', updatedUser.toJson());
+    _currentUser = updatedUser;
     return true;
   }
 
   Future<void> logout() async {
+    if (_currentUser != null) {
+      final user = _currentUser!;
+      final updatedUser = user.copyWith(
+        activityLog: [
+          ...user.activityLog,
+          {
+            'timestamp': DateTime.now().toIso8601String(),
+            'action': 'logout',
+            'details': 'User logged out',
+          },
+        ],
+      );
+      await _redis.set('user:${user.email}', updatedUser.toJson());
+    }
     _currentUser = null;
   }
 
@@ -56,9 +102,9 @@ class AuthService {
         return true;
       case UserRole.municipalityAdmin:
         return permission.startsWith('municipality:');
-      case UserRole.veterinary:
+      case UserRole.veterinaryUser:
         return permission.startsWith('veterinary:') || permission.startsWith('census:');
-      case UserRole.normal:
+      case UserRole.censusUser:
         return permission.startsWith('census:');
     }
   }
@@ -99,6 +145,13 @@ class AuthService {
       role: role,
       lastLogin: DateTime.now(),
       isActive: true,
+      activityLog: [
+        {
+          'timestamp': DateTime.now().toIso8601String(),
+          'action': 'account_created',
+          'details': 'User account created by ${_currentUser?.name ?? 'system'}',
+        },
+      ],
     );
 
     await _redis.set('user:$email', user.toJson());
@@ -106,11 +159,61 @@ class AuthService {
   }
 
   Future<void> updateUser(User user) async {
-    await _redis.set('user:${user.email}', user.toJson());
+    final currentUserJson = await _redis.get('user:${user.email}');
+    if (currentUserJson != null) {
+      final currentUser = User.fromJson(currentUserJson);
+      final updatedUser = user.copyWith(
+        activityLog: [
+          ...currentUser.activityLog,
+          {
+            'timestamp': DateTime.now().toIso8601String(),
+            'action': 'profile_updated',
+            'details': 'User profile updated by ${_currentUser?.name ?? 'system'}',
+          },
+        ],
+      );
+      await _redis.set('user:${user.email}', updatedUser.toJson());
+    } else {
+      await _redis.set('user:${user.email}', user.toJson());
+    }
   }
 
   Future<void> updatePassword(String email, String newPassword) async {
+    final userJson = await _redis.get('user:$email');
+    if (userJson != null) {
+      final user = User.fromJson(userJson);
+      final updatedUser = user.copyWith(
+        activityLog: [
+          ...user.activityLog,
+          {
+            'timestamp': DateTime.now().toIso8601String(),
+            'action': 'password_changed',
+            'details': 'Password changed by ${_currentUser?.name ?? 'system'}',
+          },
+        ],
+      );
+      await _redis.set('user:$email', updatedUser.toJson());
+    }
     await _redis.set('password:$email', newPassword);
+  }
+
+  Future<void> toggleUserStatus(String email, bool isActive) async {
+    final userJson = await _redis.get('user:$email');
+    if (userJson != null) {
+      final user = User.fromJson(userJson);
+      final updatedUser = user.copyWith(
+        isActive: isActive,
+        activityLog: [
+          ...user.activityLog,
+          {
+            'timestamp': DateTime.now().toIso8601String(),
+            'action': isActive ? 'account_activated' : 'account_deactivated',
+            'details': 'Account ${isActive ? 'activated' : 'deactivated'} by ${_currentUser?.name ?? 'system'}',
+          },
+        ],
+      );
+      await _redis.set('user:$email', updatedUser.toJson());
+    }
   }
 }
 

@@ -110,44 +110,51 @@ class HomeScreen extends ConsumerWidget {
         return _buildSystemAdminContent(context);
       case UserRole.municipalityAdmin:
         return _buildMunicipalityAdminContent(context);
-      case UserRole.veterinary:
-        return _buildVeterinaryContent(context);
-      case UserRole.normal:
-        return _buildNormalContent(context);
+      case UserRole.veterinaryUser:
+        return _buildVeterinaryUserContent(context);
+      case UserRole.censusUser:
+        return _buildCensusUserContent(context);
     }
   }
 
   Widget _buildSystemAdminContent(BuildContext context) {
-    return ListView(
+    return GridView.count(
+      crossAxisCount: 2,
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionTitle('System Administration'),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
           'User Management',
           Icons.people,
-          () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const UserManagementScreen(),
-              ),
-            );
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserManagementScreen(),
+            ),
+          ),
         ),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'System Configuration',
+          'System Settings',
           Icons.settings,
           () {
-            // Navigate to system configuration
+            // TODO: Implement system settings
           },
         ),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'Global Reports',
-          Icons.analytics,
+          'Reports',
+          Icons.assessment,
           () {
-            // Navigate to global reports
+            // TODO: Implement reports
+          },
+        ),
+        _buildMenuCard(
+          context,
+          'Audit Log',
+          Icons.history,
+          () {
+            // TODO: Implement audit log
           },
         ),
       ],
@@ -155,141 +162,108 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildMunicipalityAdminContent(BuildContext context) {
-    return ListView(
+    return GridView.count(
+      crossAxisCount: 2,
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionTitle('Municipality Administration'),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'Council Management',
-          Icons.business,
-          () {
-            // Navigate to council management
-          },
-        ),
-        _buildFeatureCard(
-          context,
-          'Location Management',
+          'Municipality Data',
           Icons.location_city,
           () {
-            // Navigate to location management
+            // TODO: Implement municipality data management
           },
         ),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'Council Reports',
+          'Reports',
           Icons.assessment,
           () {
-            // Navigate to council reports
+            // TODO: Implement reports
           },
         ),
       ],
     );
   }
 
-  Widget _buildVeterinaryContent(BuildContext context) {
-    return ListView(
+  Widget _buildVeterinaryUserContent(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionTitle('Veterinary Mode'),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'Animal Health',
+          'Animal Records',
           Icons.pets,
           () {
-            // Navigate to animal health
+            // TODO: Implement animal records
           },
         ),
-        _buildFeatureCard(
-          context,
-          'Clinical Notes',
-          Icons.note_add,
-          () {
-            // Navigate to clinical notes
-          },
-        ),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
           'Treatments',
           Icons.medical_services,
           () {
-            // Navigate to treatments
-          },
-        ),
-        _buildFeatureCard(
-          context,
-          'Census Data',
-          Icons.people,
-          () {
-            // Navigate to census data
+            // TODO: Implement treatments
           },
         ),
       ],
     );
   }
 
-  Widget _buildNormalContent(BuildContext context) {
-    return ListView(
+  Widget _buildCensusUserContent(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
       padding: const EdgeInsets.all(16),
       children: [
-        _buildSectionTitle('Census Mode'),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'House Registration',
-          Icons.house,
+          'Census Data',
+          Icons.people_alt,
           () {
-            // Navigate to house registration
+            // TODO: Implement census data
           },
         ),
-        _buildFeatureCard(
+        _buildMenuCard(
           context,
-          'Animal Registration',
-          Icons.pets,
+          'Reports',
+          Icons.assessment,
           () {
-            // Navigate to animal registration
-          },
-        ),
-        _buildFeatureCard(
-          context,
-          'Census Collection',
-          Icons.people,
-          () {
-            // Navigate to census collection
+            // TODO: Implement reports
           },
         ),
       ],
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeatureCard(
+  Widget _buildMenuCard(
     BuildContext context,
     String title,
     IconData icon,
     VoidCallback onTap,
   ) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ListTile(
-        leading: Icon(icon, size: 32),
-        title: Text(
-          title,
-          style: const TextStyle(fontSize: 18),
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios),
+      elevation: 4,
+      child: InkWell(
         onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: Theme.of(context).primaryColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

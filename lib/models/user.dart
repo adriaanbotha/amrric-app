@@ -1,10 +1,11 @@
 import 'package:upstash_redis/upstash_redis.dart';
+import 'package:flutter/foundation.dart';
 
 enum UserRole {
   systemAdmin,
   municipalityAdmin,
-  veterinary,
-  normal
+  veterinaryUser,
+  censusUser,
 }
 
 class User {
@@ -15,6 +16,8 @@ class User {
   final String? municipalityId; // For municipality admin
   final DateTime lastLogin;
   final bool isActive;
+  final int loginAttempts;
+  final List<Map<String, dynamic>> activityLog;
 
   User({
     required this.id,
@@ -24,20 +27,25 @@ class User {
     this.municipalityId,
     required this.lastLogin,
     required this.isActive,
-  });
+    this.loginAttempts = 0,
+    List<Map<String, dynamic>>? activityLog,
+  }) : activityLog = activityLog ?? [];
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'],
-      email: json['email'],
-      name: json['name'],
+      id: json['id'] as String,
+      email: json['email'] as String,
+      name: json['name'] as String,
       role: UserRole.values.firstWhere(
         (e) => e.toString() == 'UserRole.${json['role']}',
-        orElse: () => UserRole.normal,
       ),
       municipalityId: json['municipalityId'],
-      lastLogin: DateTime.parse(json['lastLogin']),
-      isActive: json['isActive'],
+      lastLogin: DateTime.parse(json['lastLogin'] as String),
+      isActive: json['isActive'] as bool,
+      loginAttempts: json['loginAttempts'] as int? ?? 0,
+      activityLog: (json['activityLog'] as List<dynamic>?)
+          ?.map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
     );
   }
 
@@ -50,8 +58,32 @@ class User {
       'municipalityId': municipalityId,
       'lastLogin': lastLogin.toIso8601String(),
       'isActive': isActive,
+      'loginAttempts': loginAttempts,
+      'activityLog': activityLog,
     };
   }
 
-  bool get requiresOfflineCache => role == UserRole.veterinary || role == UserRole.normal;
+  User copyWith({
+    String? id,
+    String? email,
+    String? name,
+    UserRole? role,
+    DateTime? lastLogin,
+    bool? isActive,
+    int? loginAttempts,
+    List<Map<String, dynamic>>? activityLog,
+  }) {
+    return User(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      lastLogin: lastLogin ?? this.lastLogin,
+      isActive: isActive ?? this.isActive,
+      loginAttempts: loginAttempts ?? this.loginAttempts,
+      activityLog: activityLog ?? this.activityLog,
+    );
+  }
+
+  bool get requiresOfflineCache => role == UserRole.veterinaryUser || role == UserRole.censusUser;
 } 
