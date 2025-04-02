@@ -36,6 +36,10 @@ class UpstashConfig {
       final result = await _redis!.ping();
       print('Redis ping result: $result');
 
+      // Test getting councils
+      final councilKeys = await _redis!.keys('council:*');
+      print('Found ${councilKeys.length} council keys: $councilKeys');
+
       print('Successfully connected to Upstash Redis');
     } catch (e, stackTrace) {
       print('Error connecting to Redis: $e');
@@ -69,44 +73,6 @@ class UpstashConfig {
       print('Error resetting Redis: $e');
       print('Stack trace: $stackTrace');
       rethrow;
-    }
-  }
-
-  // Helper methods for common Redis operations
-  static Future<String?> get(String key) async {
-    try {
-      return await redis.get(key);
-    } catch (e) {
-      print('Error getting key $key: $e');
-      return null;
-    }
-  }
-
-  static Future<void> set(String key, String value) async {
-    try {
-      await redis.set(key, value);
-    } catch (e) {
-      print('Error setting key $key: $e');
-      rethrow;
-    }
-  }
-
-  static Future<void> delete(String key) async {
-    try {
-      await redis.del([key]);
-    } catch (e) {
-      print('Error deleting key $key: $e');
-      rethrow;
-    }
-  }
-
-  static Future<List<String>> keys(String pattern) async {
-    try {
-      final result = await redis.keys(pattern);
-      return result.map((e) => e.toString()).toList();
-    } catch (e) {
-      print('Error getting keys with pattern $pattern: $e');
-      return [];
     }
   }
 } 

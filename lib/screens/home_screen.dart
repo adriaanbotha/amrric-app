@@ -6,6 +6,7 @@ import 'package:amrric_app/screens/login_screen.dart';
 import 'package:amrric_app/screens/admin/user_management_screen.dart';
 import 'package:amrric_app/screens/admin/system_settings_screen.dart';
 import 'package:amrric_app/screens/reports_screen.dart';
+import 'package:amrric_app/screens/admin/council_management_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -159,11 +160,14 @@ class HomeScreen extends ConsumerWidget {
         ),
         _buildMenuCard(
           context,
-          'Audit Log',
-          Icons.history,
-          () {
-            // TODO: Implement audit log
-          },
+          'Municipality Data',
+          Icons.location_city,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CouncilManagementScreen(),
+            ),
+          ),
         ),
       ],
     );
@@ -178,9 +182,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Municipality Data',
           Icons.location_city,
-          () {
-            // TODO: Implement municipality data
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CouncilManagementScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,

@@ -9,44 +9,42 @@ class CouncilService {
 
   // Create a new council
   Future<Council> createCouncil(Council council) async {
-    final key = 'councils:${council.id}';
-    final nameKey = 'council_names:${council.name.toLowerCase()}';
-
-    // Check if council name already exists
-    final existingId = await _redis.get(nameKey);
-    if (existingId != null) {
-      throw Exception('A council with this name already exists');
+    if (!council.validate()) {
+      throw Exception('Invalid council data');
     }
 
-    // Store council data
-    await _redis.set(key, council.toJson());
-    await _redis.set(nameKey, council.id);
+    // Check if name is unique
+    final existingCouncils = await getCouncils();
+    if (existingCouncils.any((c) => c.name == council.name)) {
+      throw Exception('Council name must be unique');
+    }
 
-    // Add to council list
-    await _redis.sadd('councils', [council.id]);
-
-    // Add to state-specific set
-    await _redis.sadd('councils:state:${council.state}', [council.id]);
+    // Store council
+    final councilData = council.toJson();
+    await _redis.hset(
+      'council:${council.id}',
+      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+    );
 
     return council;
   }
 
   // Get a council by ID
   Future<Council?> getCouncil(String id) async {
-    final data = await _redis.get('councils:$id');
-    if (data == null) return null;
+    final data = await _redis.hgetall('council:$id');
+    if (data == null || data.isEmpty) return null;
     return Council.fromJson(data);
   }
 
   // Get all councils
-  Future<List<Council>> getAllCouncils() async {
-    final councilIds = await _redis.smembers('councils');
+  Future<List<Council>> getCouncils() async {
+    final keys = await _redis.keys('council:*');
     final councils = <Council>[];
 
-    for (final id in councilIds) {
-      final council = await getCouncil(id);
-      if (council != null) {
-        councils.add(council);
+    for (final key in keys) {
+      final data = await _redis.hgetall(key);
+      if (data != null && data.isNotEmpty) {
+        councils.add(Council.fromJson(data));
       }
     }
 
@@ -70,36 +68,29 @@ class CouncilService {
 
   // Update a council
   Future<Council> updateCouncil(Council council) async {
-    final key = 'councils:${council.id}';
+    if (!council.validate()) {
+      throw Exception('Invalid council data');
+    }
+
     final existingCouncil = await getCouncil(council.id);
-    
     if (existingCouncil == null) {
       throw Exception('Council not found');
     }
 
-    // If name changed, update the name index
+    // Check if name is unique if changed
     if (existingCouncil.name != council.name) {
-      final oldNameKey = 'council_names:${existingCouncil.name.toLowerCase()}';
-      final newNameKey = 'council_names:${council.name.toLowerCase()}';
-      
-      // Check if new name is already taken by another council
-      final existingId = await _redis.get(newNameKey);
-      if (existingId != null && existingId != council.id) {
-        throw Exception('A council with this name already exists');
+      final existingCouncils = await getCouncils();
+      if (existingCouncils.any((c) => c.name == council.name)) {
+        throw Exception('Council name must be unique');
       }
-
-      await _redis.del([oldNameKey]);
-      await _redis.set(newNameKey, council.id);
     }
 
-    // If state changed, update state sets
-    if (existingCouncil.state != council.state) {
-      await _redis.srem('councils:state:${existingCouncil.state}', [council.id]);
-      await _redis.sadd('councils:state:${council.state}', [council.id]);
-    }
-
-    // Update council data
-    await _redis.set(key, council.toJson());
+    // Update council
+    final councilData = council.toJson();
+    await _redis.hset(
+      'council:${council.id}',
+      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+    );
 
     return council;
   }
@@ -107,36 +98,33 @@ class CouncilService {
   // Delete a council
   Future<void> deleteCouncil(String id) async {
     final council = await getCouncil(id);
-    if (council == null) return;
+    if (council == null) {
+      throw Exception('Council not found');
+    }
 
-    final key = 'councils:$id';
-    final nameKey = 'council_names:${council.name.toLowerCase()}';
+    // Check if council has associated locations
+    final locationCount = await _redis.scard('council:$id:locations');
+    if (locationCount > 0) {
+      throw Exception('Cannot delete council with associated locations');
+    }
 
-    // Remove from all indexes
-    await _redis.del([key]);
-    await _redis.del([nameKey]);
-    await _redis.srem('councils', [id]);
-    await _redis.srem('councils:state:${council.state}', [id]);
+    // Delete council
+    await _redis.del(['council:$id']);
   }
 
   // Search councils by name
   Future<List<Council>> searchCouncils(String query) async {
-    final councilIds = await _redis.smembers('councils');
-    final councils = <Council>[];
-    final queryLower = query.toLowerCase();
-
-    for (final id in councilIds) {
-      final council = await getCouncil(id);
-      if (council != null && council.name.toLowerCase().contains(queryLower)) {
-        councils.add(council);
-      }
-    }
-
-    return councils;
+    final councils = await getCouncils();
+    final lowercaseQuery = query.toLowerCase();
+    
+    return councils.where((council) {
+      return council.name.toLowerCase().contains(lowercaseQuery) ||
+             council.state.toLowerCase().contains(lowercaseQuery);
+    }).toList();
   }
 
   // Toggle council status
-  Future<Council> toggleCouncilStatus(String id) async {
+  Future<void> toggleCouncilStatus(String id) async {
     final council = await getCouncil(id);
     if (council == null) {
       throw Exception('Council not found');
@@ -147,8 +135,7 @@ class CouncilService {
       updatedAt: DateTime.now(),
     );
 
-    await _redis.set('councils:$id', updatedCouncil.toJson());
-    return updatedCouncil;
+    await updateCouncil(updatedCouncil);
   }
 
   // Update council image
@@ -163,7 +150,11 @@ class CouncilService {
       updatedAt: DateTime.now(),
     );
 
-    await _redis.set('councils:$id', updatedCouncil.toJson());
+    final councilData = updatedCouncil.toJson();
+    await _redis.hset(
+      'council:${updatedCouncil.id}',
+      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+    );
     return updatedCouncil;
   }
 
@@ -179,7 +170,11 @@ class CouncilService {
       updatedAt: DateTime.now(),
     );
 
-    await _redis.set('councils:$id', updatedCouncil.toJson());
+    final councilData = updatedCouncil.toJson();
+    await _redis.hset(
+      'council:${updatedCouncil.id}',
+      councilData.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+    );
     return updatedCouncil;
   }
 } 

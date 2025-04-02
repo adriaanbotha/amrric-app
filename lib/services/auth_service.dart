@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/models/user.dart';
@@ -8,61 +9,82 @@ class AuthService {
   User? _currentUser;
   String? _authToken;
 
-  AuthService(this._redis);
+  AuthService(this._redis) {
+    debugPrint('AuthService initialized');
+  }
 
   User? get currentUser => _currentUser;
   String? get authToken => _authToken;
   bool get isAuthenticated => _currentUser != null;
 
   Future<bool> login(String email, String password) async {
-    final userJson = await _redis.get('user:$email');
-    if (userJson == null) {
-      throw Exception('User not found');
-    }
+    debugPrint('Attempting login for email: $email');
+    
+    try {
+      final userJson = await _redis.hgetall('user:$email');
+      debugPrint('Retrieved user data: $userJson');
+      
+      if (userJson == null || userJson.isEmpty) {
+        debugPrint('User not found: $email');
+        throw Exception('User not found');
+      }
 
-    final storedPassword = await _redis.get('password:$email');
-    if (storedPassword != password) {
-      // Increment login attempts
-      final user = User.fromJson(userJson);
+      final storedPassword = await _redis.get('password:$email');
+      debugPrint('Retrieved stored password for comparison');
+      
+      if (storedPassword != password) {
+        debugPrint('Invalid password attempt for user: $email');
+        // Increment login attempts
+        final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
+        final updatedUser = user.copyWith(
+          loginAttempts: user.loginAttempts + 1,
+          activityLog: [
+            ...user.activityLog,
+            {
+              'timestamp': DateTime.now().toIso8601String(),
+              'action': 'login_failed',
+              'details': 'Invalid password attempt',
+            },
+          ],
+        );
+        final userData = updatedUser.toJson();
+        await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
+        throw Exception('Invalid password');
+      }
+
+      final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
+      if (!user.isActive) {
+        debugPrint('Inactive user attempted login: $email');
+        throw Exception('User account is inactive');
+      }
+
+      debugPrint('Login successful for user: $email');
+      // Reset login attempts and update last login
       final updatedUser = user.copyWith(
-        loginAttempts: user.loginAttempts + 1,
+        loginAttempts: 0,
+        lastLogin: DateTime.now(),
         activityLog: [
           ...user.activityLog,
           {
             'timestamp': DateTime.now().toIso8601String(),
-            'action': 'login_failed',
-            'details': 'Invalid password attempt',
+            'action': 'login_success',
+            'details': 'Successful login',
           },
         ],
       );
-      await _redis.set('user:$email', updatedUser.toJson());
-      throw Exception('Invalid password');
+      final userData = updatedUser.toJson();
+      await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
+      _currentUser = updatedUser;
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('Error during login: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
     }
-
-    final user = User.fromJson(userJson);
-    if (!user.isActive) {
-      throw Exception('User account is inactive');
-    }
-
-    // Reset login attempts and update last login
-    final updatedUser = user.copyWith(
-      loginAttempts: 0,
-      lastLogin: DateTime.now(),
-      activityLog: [
-        ...user.activityLog,
-        {
-          'timestamp': DateTime.now().toIso8601String(),
-          'action': 'login_success',
-          'details': 'Successful login',
-        },
-      ],
-    );
-    await _redis.set('user:$email', updatedUser.toJson());
-    _currentUser = updatedUser;
-    return true;
   }
 
   Future<void> logout() async {
+    debugPrint('Logging out user: ${_currentUser?.email}');
     if (_currentUser != null) {
       final user = _currentUser!;
       final updatedUser = user.copyWith(
@@ -75,21 +97,28 @@ class AuthService {
           },
         ],
       );
-      await _redis.set('user:${user.email}', updatedUser.toJson());
+      final userData = updatedUser.toJson();
+      await _redis.hset('user:${user.email}', userData.map((key, value) => MapEntry(key, value.toString())));
     }
     _currentUser = null;
+    debugPrint('Logout complete');
   }
 
   Future<bool> checkAuth() async {
+    debugPrint('Checking authentication status');
     if (_authToken == null) return false;
     
     try {
-      final tokenData = await _redis.get('token:$_authToken');
-      if (tokenData == null) return false;
+      final tokenData = await _redis.hgetall('token:$_authToken');
+      debugPrint('Retrieved token data: $tokenData');
       
-      _currentUser = User.fromJson(tokenData);
+      if (tokenData == null || tokenData.isEmpty) return false;
+      
+      _currentUser = User.fromJson(tokenData.map((key, value) => MapEntry(key, value.toString())));
+      debugPrint('Authentication successful for user: ${_currentUser?.email}');
       return true;
     } catch (e) {
+      debugPrint('Error checking authentication: $e');
       return false;
     }
   }
@@ -114,9 +143,9 @@ class AuthService {
     final users = <User>[];
     
     for (final key in keys) {
-      final userJson = await _redis.get(key);
-      if (userJson != null) {
-        users.add(User.fromJson(userJson));
+      final userJson = await _redis.hgetall(key);
+      if (userJson != null && userJson.isNotEmpty) {
+        users.add(User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString()))));
       }
     }
     
@@ -133,8 +162,8 @@ class AuthService {
     required String name,
     required UserRole role,
   }) async {
-    final userExists = await _redis.get('user:$email');
-    if (userExists != null) {
+    final userExists = await _redis.hgetall('user:$email');
+    if (userExists != null && userExists.isNotEmpty) {
       throw Exception('User already exists');
     }
 
@@ -154,14 +183,15 @@ class AuthService {
       ],
     );
 
-    await _redis.set('user:$email', user.toJson());
+    final userData = user.toJson();
+    await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
     await _redis.set('password:$email', password);
   }
 
   Future<void> updateUser(User user) async {
-    final currentUserJson = await _redis.get('user:${user.email}');
-    if (currentUserJson != null) {
-      final currentUser = User.fromJson(currentUserJson);
+    final currentUserJson = await _redis.hgetall('user:${user.email}');
+    if (currentUserJson != null && currentUserJson.isNotEmpty) {
+      final currentUser = User.fromJson(currentUserJson.map((key, value) => MapEntry(key, value.toString())));
       final updatedUser = user.copyWith(
         activityLog: [
           ...currentUser.activityLog,
@@ -172,16 +202,18 @@ class AuthService {
           },
         ],
       );
-      await _redis.set('user:${user.email}', updatedUser.toJson());
+      final userData = updatedUser.toJson();
+      await _redis.hset('user:${user.email}', userData.map((key, value) => MapEntry(key, value.toString())));
     } else {
-      await _redis.set('user:${user.email}', user.toJson());
+      final userData = user.toJson();
+      await _redis.hset('user:${user.email}', userData.map((key, value) => MapEntry(key, value.toString())));
     }
   }
 
   Future<void> updatePassword(String email, String newPassword) async {
-    final userJson = await _redis.get('user:$email');
-    if (userJson != null) {
-      final user = User.fromJson(userJson);
+    final userJson = await _redis.hgetall('user:$email');
+    if (userJson != null && userJson.isNotEmpty) {
+      final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
       final updatedUser = user.copyWith(
         activityLog: [
           ...user.activityLog,
@@ -192,15 +224,16 @@ class AuthService {
           },
         ],
       );
-      await _redis.set('user:$email', updatedUser.toJson());
+      final userData = updatedUser.toJson();
+      await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
     }
     await _redis.set('password:$email', newPassword);
   }
 
   Future<void> toggleUserStatus(String email, bool isActive) async {
-    final userJson = await _redis.get('user:$email');
-    if (userJson != null) {
-      final user = User.fromJson(userJson);
+    final userJson = await _redis.hgetall('user:$email');
+    if (userJson != null && userJson.isNotEmpty) {
+      final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
       final updatedUser = user.copyWith(
         isActive: isActive,
         activityLog: [
@@ -212,7 +245,8 @@ class AuthService {
           },
         ],
       );
-      await _redis.set('user:$email', updatedUser.toJson());
+      final userData = updatedUser.toJson();
+      await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
     }
   }
 
@@ -220,10 +254,10 @@ class AuthService {
     final email = await _redis.get('current:user');
     if (email == null) return null;
 
-    final userData = await _redis.get('users:$email');
-    if (userData == null) return null;
+    final userData = await _redis.hgetall('users:$email');
+    if (userData == null || userData.isEmpty) return null;
 
-    return User.fromJson(userData);
+    return User.fromJson(userData.map((key, value) => MapEntry(key, value.toString())));
   }
 }
 

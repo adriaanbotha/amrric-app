@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:upstash_redis/upstash_redis.dart';
 import 'package:flutter/foundation.dart';
 
@@ -32,35 +33,85 @@ class User {
   }) : activityLog = activityLog ?? [];
 
   factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id'] as String,
-      email: json['email'] as String,
-      name: json['name'] as String,
-      role: UserRole.values.firstWhere(
-        (e) => e.toString() == 'UserRole.${json['role']}',
-      ),
-      municipalityId: json['municipalityId'],
-      lastLogin: DateTime.parse(json['lastLogin'] as String),
-      isActive: json['isActive'] as bool,
-      loginAttempts: json['loginAttempts'] as int? ?? 0,
-      activityLog: (json['activityLog'] as List<dynamic>?)
-          ?.map((e) => Map<String, dynamic>.from(e as Map))
-          .toList(),
-    );
+    debugPrint('Creating User from JSON: $json');
+    
+    // Convert string 'true'/'false' to bool
+    bool parseStringBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      return false;
+    }
+
+    // Parse login attempts
+    int parseLoginAttempts(dynamic value) {
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    // Parse activity log
+    List<Map<String, dynamic>> parseActivityLog(dynamic value) {
+      try {
+        if (value is List) {
+          return value.map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        if (value is String) {
+          final decoded = jsonDecode(value);
+          if (decoded is List) {
+            return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+        debugPrint('Failed to parse activity log: $value');
+        return [];
+      } catch (e) {
+        debugPrint('Error parsing activity log: $e');
+        return [];
+      }
+    }
+
+    try {
+      final user = User(
+        id: json['id']?.toString() ?? '',
+        email: json['email']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        role: UserRole.values.firstWhere(
+          (e) => e.toString().split('.').last.toLowerCase() == (json['role']?.toString() ?? '').toLowerCase(),
+          orElse: () => UserRole.censusUser,
+        ),
+        municipalityId: json['municipalityId']?.toString(),
+        lastLogin: DateTime.tryParse(json['lastLogin']?.toString() ?? '') ?? DateTime.now(),
+        isActive: parseStringBool(json['isActive']),
+        loginAttempts: parseLoginAttempts(json['loginAttempts']),
+        activityLog: parseActivityLog(json['activityLog']),
+      );
+      debugPrint('Successfully created User object: ${user.toString()}');
+      return user;
+    } catch (e, stackTrace) {
+      debugPrint('Error creating User from JSON: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final json = {
       'id': id,
       'email': email,
       'name': name,
       'role': role.toString().split('.').last,
       'municipalityId': municipalityId,
       'lastLogin': lastLogin.toIso8601String(),
-      'isActive': isActive,
-      'loginAttempts': loginAttempts,
+      'isActive': isActive.toString(),
+      'loginAttempts': loginAttempts.toString(),
       'activityLog': activityLog,
     };
+    debugPrint('Converting User to JSON: $json');
+    return json;
+  }
+
+  @override
+  String toString() {
+    return 'User(id: $id, email: $email, name: $name, role: $role, isActive: $isActive, loginAttempts: $loginAttempts)';
   }
 
   User copyWith({
@@ -68,16 +119,19 @@ class User {
     String? email,
     String? name,
     UserRole? role,
+    String? municipalityId,
     DateTime? lastLogin,
     bool? isActive,
     int? loginAttempts,
     List<Map<String, dynamic>>? activityLog,
   }) {
+    debugPrint('Creating copy of User with changes: ${{'id': id, 'email': email, 'name': name, 'role': role, 'isActive': isActive, 'loginAttempts': loginAttempts}}');
     return User(
       id: id ?? this.id,
       email: email ?? this.email,
       name: name ?? this.name,
       role: role ?? this.role,
+      municipalityId: municipalityId ?? this.municipalityId,
       lastLogin: lastLogin ?? this.lastLogin,
       isActive: isActive ?? this.isActive,
       loginAttempts: loginAttempts ?? this.loginAttempts,
