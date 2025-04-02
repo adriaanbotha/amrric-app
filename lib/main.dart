@@ -7,14 +7,57 @@ import 'package:flutter_svg/flutter_svg.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Upstash
-  await UpstashConfig.initialize();
-  
-  runApp(
-    const ProviderScope(
-      child: AmrricApp(),
-    ),
-  );
+  try {
+    // Initialize Upstash
+    await UpstashConfig.initialize();
+    runApp(
+      const ProviderScope(
+        child: AmrricApp(),
+      ),
+    );
+  } catch (e) {
+    print('Failed to initialize app: $e');
+    // You might want to show an error screen or handle this differently
+    runApp(
+      const ProviderScope(
+        child: ErrorApp(),
+      ),
+    );
+  }
+}
+
+class ErrorApp extends StatelessWidget {
+  const ErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'AMRRIC - Error',
+      theme: AmrricTheme.theme,
+      home: Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to connect to the server',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
+                  // You might want to add retry logic here
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class AmrricApp extends StatelessWidget {

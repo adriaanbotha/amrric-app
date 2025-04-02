@@ -1,16 +1,26 @@
 import 'package:upstash_redis/upstash_redis.dart';
 
 class UpstashConfig {
-  static const String url = String.fromEnvironment('UPSTASH_REDIS_URL');
-  static const String token = String.fromEnvironment('UPSTASH_REDIS_TOKEN');
+  // Using direct values for development - in production, use environment variables
+  static const String url = 'https://neutral-toad-19982.upstash.io';
+  static const String token = 'AU4OAAIjcDFhMzAzZjcwYzM5ZWM0NWUyYWYwMWIyODY0MGRkNWE1YnAxMA';
 
   static late final Redis redis;
 
   static Future<void> initialize() async {
-    redis = Redis(
-      url: url,
-      token: token,
-    );
+    try {
+      redis = Redis(
+        url: url,
+        token: token,
+      );
+      
+      // Test the connection
+      await redis.ping();
+      print('Successfully connected to Upstash Redis');
+    } catch (e) {
+      print('Error connecting to Upstash Redis: $e');
+      rethrow;
+    }
   }
 
   // Helper methods for common Redis operations
@@ -28,6 +38,7 @@ class UpstashConfig {
       await redis.set(key, value);
     } catch (e) {
       print('Error setting key $key: $e');
+      rethrow;
     }
   }
 
@@ -36,6 +47,7 @@ class UpstashConfig {
       await redis.del([key]);
     } catch (e) {
       print('Error deleting key $key: $e');
+      rethrow;
     }
   }
 
