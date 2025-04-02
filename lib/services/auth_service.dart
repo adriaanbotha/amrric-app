@@ -215,6 +215,16 @@ class AuthService {
       await _redis.set('user:$email', updatedUser.toJson());
     }
   }
+
+  Future<User?> getCurrentUser() async {
+    final email = await _redis.get('current:user');
+    if (email == null) return null;
+
+    final userData = await _redis.get('users:$email');
+    if (userData == null) return null;
+
+    return User.fromJson(userData);
+  }
 }
 
 final authServiceProvider = Provider<AuthService>((ref) {

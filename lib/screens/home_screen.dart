@@ -5,6 +5,7 @@ import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/screens/login_screen.dart';
 import 'package:amrric_app/screens/admin/user_management_screen.dart';
 import 'package:amrric_app/screens/admin/system_settings_screen.dart';
+import 'package:amrric_app/screens/reports_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -149,9 +150,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Reports',
           Icons.assessment,
-          () {
-            // TODO: Implement reports
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ReportsScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,
@@ -175,15 +179,34 @@ class HomeScreen extends ConsumerWidget {
           'Municipality Data',
           Icons.location_city,
           () {
-            // TODO: Implement municipality data management
+            // TODO: Implement municipality data
           },
         ),
         _buildMenuCard(
           context,
           'Reports',
           Icons.assessment,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ReportsScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
+          'Animal Records',
+          Icons.pets,
           () {
-            // TODO: Implement reports
+            // TODO: Implement animal records
+          },
+        ),
+        _buildMenuCard(
+          context,
+          'Treatments',
+          Icons.medical_services,
+          () {
+            // TODO: Implement treatments
           },
         ),
       ],
@@ -211,6 +234,25 @@ class HomeScreen extends ConsumerWidget {
             // TODO: Implement treatments
           },
         ),
+        _buildMenuCard(
+          context,
+          'Reports',
+          Icons.assessment,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ReportsScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
+          'Medication',
+          Icons.medication,
+          () {
+            // TODO: Implement medication
+          },
+        ),
       ],
     );
   }
@@ -223,7 +265,7 @@ class HomeScreen extends ConsumerWidget {
         _buildMenuCard(
           context,
           'Census Data',
-          Icons.people_alt,
+          Icons.people,
           () {
             // TODO: Implement census data
           },
@@ -232,8 +274,27 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Reports',
           Icons.assessment,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ReportsScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
+          'Animal Records',
+          Icons.pets,
           () {
-            // TODO: Implement reports
+            // TODO: Implement animal records
+          },
+        ),
+        _buildMenuCard(
+          context,
+          'Location Data',
+          Icons.location_on,
+          () {
+            // TODO: Implement location data
           },
         ),
       ],
