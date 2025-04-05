@@ -52,14 +52,8 @@ class AuthService {
         throw Exception('Invalid password');
       }
 
+      // Reset login attempts on successful login
       final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
-      if (!user.isActive) {
-        debugPrint('Inactive user attempted login: $email');
-        throw Exception('User account is inactive');
-      }
-
-      debugPrint('Login successful for user: $email');
-      // Reset login attempts and update last login
       final updatedUser = user.copyWith(
         loginAttempts: 0,
         lastLogin: DateTime.now(),
@@ -68,16 +62,20 @@ class AuthService {
           {
             'timestamp': DateTime.now().toIso8601String(),
             'action': 'login_success',
-            'details': 'Successful login',
+            'details': 'User logged in successfully',
           },
         ],
       );
       final userData = updatedUser.toJson();
       await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
+
       _currentUser = updatedUser;
+      _authToken = 'dummy_token_${DateTime.now().millisecondsSinceEpoch}';
+      await _redis.set('current:user', email);
+      debugPrint('Login successful for user: $email');
       return true;
     } catch (e, stackTrace) {
-      debugPrint('Error during login: $e');
+      debugPrint('Login error: $e');
       debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
@@ -99,6 +97,7 @@ class AuthService {
       );
       final userData = updatedUser.toJson();
       await _redis.hset('user:${user.email}', userData.map((key, value) => MapEntry(key, value.toString())));
+      await _redis.del(['current:user']);
     }
     _currentUser = null;
     debugPrint('Logout complete');
@@ -128,13 +127,19 @@ class AuthService {
     
     switch (_currentUser!.role) {
       case UserRole.systemAdmin:
-        return true;
+        return true;  // System admin has all permissions
       case UserRole.municipalityAdmin:
-        return permission.startsWith('municipality:');
+        return permission.startsWith('municipality:') ||
+               permission.startsWith('animal:view') ||
+               permission.startsWith('animal:edit') ||
+               permission.startsWith('animal:validate');
       case UserRole.veterinaryUser:
-        return permission.startsWith('veterinary:') || permission.startsWith('census:');
+        return permission.startsWith('veterinary:') ||
+               permission.startsWith('animal:') ||  // Full animal management access
+               permission.startsWith('medical:');   // Medical record access
       case UserRole.censusUser:
-        return permission.startsWith('census:');
+        return permission.startsWith('census:') ||
+               permission.startsWith('animal:basic:');  // Basic animal operations only
     }
   }
 
@@ -161,6 +166,8 @@ class AuthService {
     required String password,
     required String name,
     required UserRole role,
+    String? councilId,
+    String? municipalityId,
   }) async {
     final userExists = await _redis.hgetall('user:$email');
     if (userExists != null && userExists.isNotEmpty) {
@@ -174,6 +181,8 @@ class AuthService {
       role: role,
       lastLogin: DateTime.now(),
       isActive: true,
+      councilId: councilId,
+      municipalityId: municipalityId,
       activityLog: [
         {
           'timestamp': DateTime.now().toIso8601String(),
@@ -261,10 +270,12 @@ class AuthService {
   }
 
   Future<User?> getCurrentUser() async {
+    if (_currentUser != null) return _currentUser;
+    
     final email = await _redis.get('current:user');
     if (email == null) return null;
 
-    final userData = await _redis.hgetall('users:$email');
+    final userData = await _redis.hgetall('user:$email');
     if (userData == null || userData.isEmpty) return null;
 
     return User.fromJson(userData.map((key, value) => MapEntry(key, value.toString())));

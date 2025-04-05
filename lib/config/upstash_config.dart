@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:upstash_redis/upstash_redis.dart';
 
@@ -11,16 +12,16 @@ class UpstashConfig {
     return _redis!;
   }
 
-  static Future<void> initialize() async {
+  static Future<Redis> initialize() async {
     if (_redis != null) {
-      print('Redis already initialized');
-      return;
+      debugPrint('Redis already initialized');
+      return _redis!;
     }
 
     final url = dotenv.env['UPSTASH_REDIS_REST_URL'];
     final token = dotenv.env['UPSTASH_REDIS_REST_TOKEN'];
 
-    print('Initializing Redis with URL: $url');
+    debugPrint('Initializing Redis with URL: $url');
 
     if (url == null || token == null) {
       throw Exception('Missing Upstash Redis configuration. Please check your .env file.');
@@ -34,12 +35,12 @@ class UpstashConfig {
 
       // Test the connection
       final result = await _redis!.ping();
-      print('Redis ping result: $result');
-
-      print('Successfully connected to Upstash Redis');
+      debugPrint('Redis ping result: $result');
+      debugPrint('Successfully connected to Upstash Redis');
+      return _redis!;
     } catch (e, stackTrace) {
-      print('Error connecting to Redis: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error connecting to Redis: $e');
+      debugPrint('Stack trace: $stackTrace');
       _redis = null;
       rethrow;
     }
@@ -53,21 +54,21 @@ class UpstashConfig {
     try {
       // Get all keys
       final keys = await _redis!.keys('*');
-      print('Found ${keys.length} keys to delete');
+      debugPrint('Found ${keys.length} keys to delete');
 
       // Delete all keys in batches
       if (keys.isNotEmpty) {
         for (var i = 0; i < keys.length; i += 100) {
           final batch = keys.skip(i).take(100).toList();
           await _redis!.del(batch);
-          print('Deleted keys ${i + 1} to ${i + batch.length}');
+          debugPrint('Deleted keys ${i + 1} to ${i + batch.length}');
         }
       }
 
-      print('Successfully cleared all Redis keys');
+      debugPrint('Successfully cleared all Redis keys');
     } catch (e, stackTrace) {
-      print('Error resetting Redis: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error resetting Redis: $e');
+      debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -77,7 +78,7 @@ class UpstashConfig {
     try {
       return await redis.get(key);
     } catch (e) {
-      print('Error getting key $key: $e');
+      debugPrint('Error getting key $key: $e');
       return null;
     }
   }
@@ -86,7 +87,7 @@ class UpstashConfig {
     try {
       await redis.set(key, value);
     } catch (e) {
-      print('Error setting key $key: $e');
+      debugPrint('Error setting key $key: $e');
       rethrow;
     }
   }
@@ -95,7 +96,7 @@ class UpstashConfig {
     try {
       await redis.del([key]);
     } catch (e) {
-      print('Error deleting key $key: $e');
+      debugPrint('Error deleting key $key: $e');
       rethrow;
     }
   }
@@ -105,7 +106,7 @@ class UpstashConfig {
       final result = await redis.keys(pattern);
       return result.map((e) => e.toString()).toList();
     } catch (e) {
-      print('Error getting keys with pattern $pattern: $e');
+      debugPrint('Error getting keys with pattern $pattern: $e');
       return [];
     }
   }

@@ -8,28 +8,27 @@ import 'package:amrric_app/screens/home_screen.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/services/council_service.dart';
 import 'package:amrric_app/services/location_service.dart';
+import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/config/test_data.dart' as test_data;
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:flutter/foundation.dart';
 
-Future<void> main() async {
+void main() async {
   try {
-    await dotenv.load(fileName: '.env');
     debugPrint('Environment loaded successfully');
+    await dotenv.load(fileName: ".env");
+    debugPrint('Starting app initialization...');
+    await UpstashConfig.initialize();
+    debugPrint('Redis initialized successfully');
+    debugPrint('Starting test data creation...');
+    await test_data.createTestData();
+    debugPrint('Test data created successfully');
     
-    runApp(
-      const ProviderScope(
-        child: AmrricApp(),
-      ),
-    );
-  } catch (e, stackTrace) {
-    debugPrint('Failed to start app: $e');
-    debugPrint('Stack trace: $stackTrace');
-    runApp(
-      const ProviderScope(
-        child: ErrorApp(),
-      ),
-    );
+    debugPrint('App initialization completed successfully');
+    runApp(const ProviderScope(child: AmrricApp()));
+  } catch (e) {
+    debugPrint('Error during initialization: $e');
+    rethrow;
   }
 }
 
@@ -58,10 +57,6 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
       await UpstashConfig.initialize();
       debugPrint('Redis initialized successfully');
       
-      // Create test data
-      await test_data.createTestData();
-      debugPrint('Test data created successfully');
-
       setState(() {
         _isInitialized = true;
         _error = null;

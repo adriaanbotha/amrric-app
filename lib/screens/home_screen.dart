@@ -9,6 +9,7 @@ import 'package:amrric_app/screens/reports_screen.dart';
 import 'package:amrric_app/screens/admin/council_management_screen.dart';
 import 'package:amrric_app/screens/profile_screen.dart';
 import 'package:amrric_app/screens/admin/location_management_screen.dart';
+import 'package:amrric_app/screens/admin/animal_management_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -63,6 +64,19 @@ class HomeScreen extends ConsumerWidget {
             const Divider(),
             // Admin Section
             if (user.role == UserRole.systemAdmin) ...[
+              ListTile(
+                leading: const Icon(Icons.pets),
+                title: const Text('Animal Management'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AnimalManagementScreen(),
+                    ),
+                  );
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.admin_panel_settings),
                 title: const Text('User Management'),
@@ -175,6 +189,17 @@ class HomeScreen extends ConsumerWidget {
       children: [
         _buildMenuCard(
           context,
+          'Animal Management',
+          Icons.pets,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AnimalManagementScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
           'User Management',
           Icons.people,
           () => Navigator.push(
@@ -252,9 +277,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Animal Records',
           Icons.pets,
-          () {
-            // TODO: Implement animal records
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AnimalManagementScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,
@@ -277,9 +305,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Animal Records',
           Icons.pets,
-          () {
-            // TODO: Implement animal records
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AnimalManagementScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,
@@ -340,9 +371,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Animal Records',
           Icons.pets,
-          () {
-            // TODO: Implement animal records
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AnimalManagementScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,

@@ -15,7 +15,9 @@ class User {
   final String name;
   final UserRole role;
   final String? municipalityId; // For municipality admin
-  final DateTime lastLogin;
+  final String? councilId; // For council-specific operations
+  final String? locationId; // For location-specific operations
+  final DateTime? lastLogin;
   final bool isActive;
   final int loginAttempts;
   final List<Map<String, dynamic>> activityLog;
@@ -26,89 +28,87 @@ class User {
     required this.name,
     required this.role,
     this.municipalityId,
-    required this.lastLogin,
+    this.councilId,
+    this.locationId,
+    this.lastLogin,
     required this.isActive,
     this.loginAttempts = 0,
     List<Map<String, dynamic>>? activityLog,
   }) : activityLog = activityLog ?? [];
 
   factory User.fromJson(Map<String, dynamic> json) {
-    debugPrint('Creating User from JSON: $json');
-    
-    // Convert string 'true'/'false' to bool
-    bool parseStringBool(dynamic value) {
-      if (value is bool) return value;
-      if (value is String) return value.toLowerCase() == 'true';
-      return false;
-    }
-
-    // Parse login attempts
-    int parseLoginAttempts(dynamic value) {
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-
-    // Parse activity log
-    List<Map<String, dynamic>> parseActivityLog(dynamic value) {
-      try {
-        if (value == null || value == '') return [];
-        
-        if (value is String) {
-          final decoded = jsonDecode(value);
-          if (decoded is List) {
-            return List<Map<String, dynamic>>.from(
-              decoded.map((e) => Map<String, dynamic>.from(e))
-            );
-          }
-        }
-        
-        debugPrint('Failed to parse activity log, returning empty list: $value');
-        return [];
-      } catch (e) {
-        debugPrint('Error parsing activity log: $e');
-        return [];
-      }
-    }
-
     try {
-      final user = User(
+      // Parse activity log
+      List<Map<String, dynamic>> activityLog = [];
+      if (json['activityLog'] != null) {
+        if (json['activityLog'] is String) {
+          try {
+            final decoded = jsonDecode(json['activityLog']);
+            if (decoded is List) {
+              activityLog = decoded.map((e) => e as Map<String, dynamic>).toList();
+            }
+          } catch (e) {
+            debugPrint('Error parsing activity log string: $e');
+            // If parsing fails, try to parse as a list of strings
+            try {
+              final list = jsonDecode('[' + json['activityLog'] + ']');
+              if (list is List) {
+                activityLog = list.map((e) => e as Map<String, dynamic>).toList();
+              }
+            } catch (e) {
+              debugPrint('Error parsing activity log as list: $e');
+            }
+          }
+        } else if (json['activityLog'] is List) {
+          activityLog = json['activityLog'].map((e) {
+            if (e is String) {
+              try {
+                return jsonDecode(e) as Map<String, dynamic>;
+              } catch (e) {
+                debugPrint('Error parsing activity log entry: $e');
+                return <String, dynamic>{};
+              }
+            }
+            return e as Map<String, dynamic>;
+          }).toList();
+        }
+      }
+
+      return User(
         id: json['id']?.toString() ?? '',
         email: json['email']?.toString() ?? '',
         name: json['name']?.toString() ?? '',
-        role: UserRole.values.firstWhere(
-          (e) => e.toString().split('.').last.toLowerCase() == (json['role']?.toString() ?? '').toLowerCase(),
-          orElse: () => UserRole.censusUser,
-        ),
-        municipalityId: json['municipalityId']?.toString(),
-        lastLogin: DateTime.tryParse(json['lastLogin']?.toString() ?? '') ?? DateTime.now(),
-        isActive: parseStringBool(json['isActive']),
-        loginAttempts: parseLoginAttempts(json['loginAttempts']),
-        activityLog: parseActivityLog(json['activityLog']),
+        role: _parseUserRole(json['role']?.toString() ?? ''),
+        municipalityId: json['municipalityId']?.toString() ?? '',
+        councilId: json['councilId']?.toString() ?? '',
+        locationId: json['locationId']?.toString() ?? '',
+        isActive: json['isActive']?.toString().toLowerCase() == 'true',
+        lastLogin: json['lastLogin'] != null ? DateTime.parse(json['lastLogin']) : null,
+        loginAttempts: int.tryParse(json['loginAttempts']?.toString() ?? '0') ?? 0,
+        activityLog: activityLog,
       );
-      debugPrint('Successfully created User object: ${user.toString()}');
-      return user;
-    } catch (e, stackTrace) {
-      debugPrint('Error creating User from JSON: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e, stack) {
+      debugPrint('Error parsing User from JSON: $e');
+      debugPrint('Stack trace: $stack');
+      debugPrint('JSON data: $json');
       rethrow;
     }
   }
 
   Map<String, dynamic> toJson() {
-    final json = {
+    return {
       'id': id,
       'email': email,
       'name': name,
       'role': role.toString().split('.').last,
+      'isActive': isActive,
+      'loginAttempts': loginAttempts,
+      'lastLogin': lastLogin?.toIso8601String(),
       'municipalityId': municipalityId,
-      'lastLogin': lastLogin.toIso8601String(),
-      'isActive': isActive.toString(),
-      'loginAttempts': loginAttempts.toString(),
-      'activityLog': jsonEncode(activityLog),
+      'councilId': councilId,
+      'locationId': locationId,
+      'activityLog': activityLog,
     };
-    debugPrint('Converting User to JSON: $json');
-    return json;
   }
 
   @override
@@ -122,6 +122,8 @@ class User {
     String? name,
     UserRole? role,
     String? municipalityId,
+    String? councilId,
+    String? locationId,
     DateTime? lastLogin,
     bool? isActive,
     int? loginAttempts,
@@ -134,6 +136,8 @@ class User {
       name: name ?? this.name,
       role: role ?? this.role,
       municipalityId: municipalityId ?? this.municipalityId,
+      councilId: councilId ?? this.councilId,
+      locationId: locationId ?? this.locationId,
       lastLogin: lastLogin ?? this.lastLogin,
       isActive: isActive ?? this.isActive,
       loginAttempts: loginAttempts ?? this.loginAttempts,
@@ -142,4 +146,21 @@ class User {
   }
 
   bool get requiresOfflineCache => role == UserRole.veterinaryUser || role == UserRole.censusUser;
+
+  static UserRole _parseUserRole(String value) {
+    if (value.isEmpty) throw Exception('Invalid role: $value');
+    final roleStr = value.toLowerCase();
+    switch (roleStr) {
+      case 'systemadmin':
+        return UserRole.systemAdmin;
+      case 'municipalityadmin':
+        return UserRole.municipalityAdmin;
+      case 'veterinaryuser':
+        return UserRole.veterinaryUser;
+      case 'censususer':
+        return UserRole.censusUser;
+      default:
+        throw Exception('Invalid role: $value');
+    }
+  }
 } 

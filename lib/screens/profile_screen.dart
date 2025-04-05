@@ -121,7 +121,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(height: 8),
                     _buildInfoRow(
                       'Last Login',
-                      user.lastLogin.toLocal().toString(),
+                      user.lastLogin?.toLocal().toString() ?? 'Never logged in',
                     ),
                   ],
                 ),

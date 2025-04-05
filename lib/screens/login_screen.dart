@@ -109,7 +109,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _quickLogin(String email) {
     _emailController.text = email;
-    _passwordController.text = email; // Password is same as email for testing
+    _passwordController.text = switch (email) {
+      'admin@amrric.com' => 'admin123',
+      'municipal@amrric.com' => 'municipal123',
+      'vet@amrric.com' => 'vet123',
+      'census@amrric.com' => 'census123',
+      _ => email,
+    };
     _login();
   }
 

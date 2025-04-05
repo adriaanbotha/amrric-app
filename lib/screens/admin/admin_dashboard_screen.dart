@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:amrric_app/screens/admin/location_management_screen.dart';
 import 'package:amrric_app/screens/admin/council_management_screen.dart';
+import 'package:amrric_app/screens/admin/animal_management_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -34,6 +35,18 @@ class AdminDashboardScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LocationManagementScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.pets),
+            title: const Text('Animal Management'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AnimalManagementScreen(),
                 ),
               );
             },
