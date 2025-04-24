@@ -21,6 +21,8 @@ class User {
   final bool isActive;
   final int loginAttempts;
   final List<Map<String, dynamic>> activityLog;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   User({
     required this.id,
@@ -34,42 +36,96 @@ class User {
     required this.isActive,
     this.loginAttempts = 0,
     List<Map<String, dynamic>>? activityLog,
-  }) : activityLog = activityLog ?? [];
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : activityLog = activityLog ?? [],
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   factory User.fromJson(Map<String, dynamic> json) {
     try {
-      // Parse activity log
       List<Map<String, dynamic>> activityLog = [];
+      
       if (json['activityLog'] != null) {
         if (json['activityLog'] is String) {
           try {
-            final decoded = jsonDecode(json['activityLog']);
+            String logStr = json['activityLog'] as String;
+            
+            // Check if it's a Dart Map literal format
+            if (logStr.startsWith('[{') && !logStr.contains('"')) {
+              // First, extract the structure
+              final matches = RegExp(r'\{([^}]+)\}').allMatches(logStr);
+              final entries = matches.map((match) {
+                final entryStr = match.group(1)!;
+                final parts = entryStr.split(',').map((part) {
+                  final keyValue = part.trim().split(':');
+                  if (keyValue.length != 2) return null;
+                  
+                  final key = keyValue[0].trim();
+                  var value = keyValue[1].trim();
+                  
+                  // Handle special cases
+                  if (RegExp(r'^\d+$').hasMatch(value)) {
+                    // It's a number, leave as is
+                    return '"$key": $value';
+                  } else if (value == 'true' || value == 'false') {
+                    // It's a boolean, leave as is
+                    return '"$key": $value';
+                  } else {
+                    // It's a string, add quotes
+                    return '"$key": "$value"';
+                  }
+                }).where((e) => e != null).join(',');
+                return '{$parts}';
+              }).join(',');
+              
+              logStr = '[$entries]';
+            }
+            
+            final decoded = jsonDecode(logStr);
             if (decoded is List) {
-              activityLog = decoded.map((e) => e as Map<String, dynamic>).toList();
+              activityLog = List<Map<String, dynamic>>.from(decoded);
             }
           } catch (e) {
             debugPrint('Error parsing activity log string: $e');
-            // If parsing fails, try to parse as a list of strings
+            debugPrint('Original log string: ${json['activityLog']}');
+            // Fallback: try to parse the original format directly
             try {
-              final list = jsonDecode('[' + json['activityLog'] + ']');
-              if (list is List) {
-                activityLog = list.map((e) => e as Map<String, dynamic>).toList();
-              }
-            } catch (e) {
-              debugPrint('Error parsing activity log as list: $e');
+              final rawList = json['activityLog'].toString()
+                .substring(1, json['activityLog'].toString().length - 1) // Remove outer []
+                .split('}, {')
+                .map((entry) {
+                  entry = entry.replaceAll('{', '').replaceAll('}', '');
+                  final map = <String, dynamic>{};
+                  entry.split(',').forEach((pair) {
+                    final parts = pair.trim().split(':');
+                    if (parts.length == 2) {
+                      final key = parts[0].trim();
+                      final value = parts[1].trim();
+                      map[key] = value;
+                    }
+                  });
+                  return map;
+                })
+                .toList();
+              activityLog = rawList.cast<Map<String, dynamic>>();
+            } catch (e2) {
+              debugPrint('Fallback parsing also failed: $e2');
             }
           }
         } else if (json['activityLog'] is List) {
-          activityLog = json['activityLog'].map((e) {
-            if (e is String) {
+          activityLog = (json['activityLog'] as List).map((item) {
+            if (item is Map) {
+              return Map<String, dynamic>.from(item);
+            } else if (item is String) {
               try {
-                return jsonDecode(e) as Map<String, dynamic>;
+                return jsonDecode(item) as Map<String, dynamic>;
               } catch (e) {
-                debugPrint('Error parsing activity log entry: $e');
+                debugPrint('Error parsing activity log item: $e');
                 return <String, dynamic>{};
               }
             }
-            return e as Map<String, dynamic>;
+            return <String, dynamic>{};
           }).toList();
         }
       }
@@ -79,13 +135,15 @@ class User {
         email: json['email']?.toString() ?? '',
         name: json['name']?.toString() ?? '',
         role: _parseUserRole(json['role']?.toString() ?? ''),
-        municipalityId: json['municipalityId']?.toString() ?? '',
-        councilId: json['councilId']?.toString() ?? '',
-        locationId: json['locationId']?.toString() ?? '',
+        municipalityId: json['municipalityId']?.toString(),
+        councilId: json['councilId']?.toString(),
+        locationId: json['locationId']?.toString(),
         isActive: json['isActive']?.toString().toLowerCase() == 'true',
         lastLogin: json['lastLogin'] != null ? DateTime.parse(json['lastLogin']) : null,
         loginAttempts: int.tryParse(json['loginAttempts']?.toString() ?? '0') ?? 0,
         activityLog: activityLog,
+        createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
+        updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : DateTime.now(),
       );
     } catch (e, stack) {
       debugPrint('Error parsing User from JSON: $e');
@@ -108,6 +166,8 @@ class User {
       'councilId': councilId,
       'locationId': locationId,
       'activityLog': activityLog,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
@@ -128,6 +188,8 @@ class User {
     bool? isActive,
     int? loginAttempts,
     List<Map<String, dynamic>>? activityLog,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     debugPrint('Creating copy of User with changes: ${{'id': id, 'email': email, 'name': name, 'role': role, 'isActive': isActive, 'loginAttempts': loginAttempts}}');
     return User(
@@ -142,6 +204,8 @@ class User {
       isActive: isActive ?? this.isActive,
       loginAttempts: loginAttempts ?? this.loginAttempts,
       activityLog: activityLog ?? this.activityLog,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

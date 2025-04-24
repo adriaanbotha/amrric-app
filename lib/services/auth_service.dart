@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/config/upstash_config.dart';
@@ -174,18 +175,21 @@ class AuthService {
       throw Exception('User already exists');
     }
 
+    final now = DateTime.now();
     final user = User(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: now.millisecondsSinceEpoch.toString(),
       email: email,
       name: name,
       role: role,
-      lastLogin: DateTime.now(),
+      lastLogin: now,
       isActive: true,
       councilId: councilId,
       municipalityId: municipalityId,
+      createdAt: now,
+      updatedAt: now,
       activityLog: [
         {
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': now.toIso8601String(),
           'action': 'account_created',
           'details': 'User account created by ${_currentUser?.name ?? 'system'}',
         },
@@ -193,7 +197,16 @@ class AuthService {
     );
 
     final userData = user.toJson();
-    await _redis.hset('user:$email', userData.map((key, value) => MapEntry(key, value.toString())));
+    // Convert all values to strings for Redis, ensuring proper JSON encoding for lists
+    final redisData = userData.map((key, value) {
+      if (value is List) {
+        return MapEntry(key, jsonEncode(value));
+      } else {
+        return MapEntry(key, value?.toString() ?? '');
+      }
+    });
+    
+    await _redis.hset('user:$email', redisData);
     await _redis.set('password:$email', password);
   }
 
@@ -212,10 +225,26 @@ class AuthService {
         ],
       );
       final userData = updatedUser.toJson();
-      await _redis.hset('user:${user.email}', userData.map((key, value) => MapEntry(key, value.toString())));
+      // Convert all values to strings for Redis, ensuring proper JSON encoding for lists
+      final redisData = userData.map((key, value) {
+        if (value is List) {
+          return MapEntry(key, jsonEncode(value));
+        } else {
+          return MapEntry(key, value?.toString() ?? '');
+        }
+      });
+      await _redis.hset('user:${user.email}', redisData);
     } else {
       final userData = user.toJson();
-      await _redis.hset('user:${user.email}', userData.map((key, value) => MapEntry(key, value.toString())));
+      // Convert all values to strings for Redis, ensuring proper JSON encoding for lists
+      final redisData = userData.map((key, value) {
+        if (value is List) {
+          return MapEntry(key, jsonEncode(value));
+        } else {
+          return MapEntry(key, value?.toString() ?? '');
+        }
+      });
+      await _redis.hset('user:${user.email}', redisData);
     }
   }
 
