@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/models/council.dart';
-import 'package:amrric_app/services/council_service.dart';
+import 'package:amrric_app/services/councils_notifier.dart';
 
 class CouncilManagementScreen extends ConsumerStatefulWidget {
   const CouncilManagementScreen({super.key});

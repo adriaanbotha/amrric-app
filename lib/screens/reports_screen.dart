@@ -25,7 +25,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _authService = AuthService(UpstashConfig.redis);
+    _authService = AuthService();
     _loadReportTypes();
   }
 

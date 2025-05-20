@@ -7,7 +7,7 @@ class TestDataService {
   Future<void> createTestAnimals() async {
     debugPrint('Creating test animals...');
     
-    final animalService = ref.read(animalServiceProvider);
+    final animalService = ref.read(animalsProvider.notifier);
     
     // Create test animals
     final testAnimals = [

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/config/test_data.dart';
+import 'package:amrric_app/screens/home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -20,10 +22,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isResetting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _checkExistingSession();
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkExistingSession() async {
+    setState(() => _isLoading = true);
+    try {
+      final authService = ref.read(authServiceProvider);
+      final user = await authService.getCurrentUser();
+      if (user != null && mounted) {
+        ref.read(authStateProvider.notifier).state = user;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error checking session: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _resetDatabase() async {
@@ -81,13 +112,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      final success = await authService.login(
+      final user = await authService.login(
         _emailController.text,
         _passwordController.text,
       );
 
-      if (success && mounted) {
-        ref.read(authStateProvider.notifier).state = authService.currentUser;
+      if (user != null && mounted) {
+        ref.read(authStateProvider.notifier).state = user;
+        debugPrint('authStateProvider set to: \$user');
+        
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            ),
+          );
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -238,22 +279,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  // Reset Database Button
-                  OutlinedButton.icon(
-                    onPressed: _isResetting ? null : _resetDatabase,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      foregroundColor: Colors.red,
+                  // Debug Buttons
+                  if (kDebugMode)
+                    Column(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _isResetting ? null : _clearUpstashData,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: Colors.red,
+                          ),
+                          icon: _isResetting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.delete_forever),
+                          label: const Text('Debug: Clear Upstash Data'),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _isResetting ? null : _populateTestData,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: Colors.green,
+                          ),
+                          icon: _isResetting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.add_circle),
+                          label: const Text('Debug: Populate Test Data'),
+                        ),
+                      ],
                     ),
-                    icon: _isResetting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.restore),
-                    label: const Text('Reset Database & Create Test Data'),
-                  ),
                 ],
               ),
             ),
@@ -261,6 +323,100 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _clearUpstashData() async {
+    if (_isResetting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Upstash Data?'),
+        content: const Text(
+          'This will delete all existing data from Upstash. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isResetting = true);
+
+    try {
+      await UpstashConfig.reset();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Upstash data cleared successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to clear Upstash data: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isResetting = false);
+      }
+    }
+  }
+
+  Future<void> _populateTestData() async {
+    if (_isResetting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Populate Test Data?'),
+        content: const Text(
+          'This will create test data in Upstash. '
+          'Existing data will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.green),
+            child: const Text('Populate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isResetting = true);
+
+    try {
+      await createTestData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Test data populated successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to populate test data: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isResetting = false);
+      }
+    }
   }
 
   Widget _buildQuickLoginButton(String label, String email, Color color) {

@@ -152,6 +152,8 @@ class HomeScreen extends ConsumerWidget {
               title: const Text('Logout'),
               onTap: () async {
                 await authService.logout();
+                ref.read(authStateProvider.notifier).state = null;
+                ref.invalidate(authServiceProvider);
                 if (context.mounted) {
                   Navigator.pushReplacement(
                     context,
@@ -176,7 +178,7 @@ class HomeScreen extends ConsumerWidget {
       case UserRole.municipalityAdmin:
         return _buildMunicipalityAdminContent(context);
       case UserRole.veterinaryUser:
-        return _buildVeterinaryUserContent(context);
+        return _buildVeterinaryUserContent(context, user);
       case UserRole.censusUser:
         return _buildCensusUserContent(context);
     }
@@ -296,50 +298,52 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildVeterinaryUserContent(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
+  Widget _buildVeterinaryUserContent(BuildContext context, User user) {
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      children: [
-        _buildMenuCard(
-          context,
-          'Animal Records',
-          Icons.pets,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AnimalManagementScreen(),
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Welcome, ${user.name}',
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-        ),
-        _buildMenuCard(
-          context,
-          'Treatments',
-          Icons.medical_services,
-          () {
-            // TODO: Implement treatments
-          },
-        ),
-        _buildMenuCard(
-          context,
-          'Reports',
-          Icons.assessment,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ReportsScreen(),
-            ),
+          const SizedBox(height: 24),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            children: [
+              _buildMenuCard(
+                context,
+                'Animals',
+                Icons.pets,
+                () => Navigator.pushNamed(context, '/animals'),
+              ),
+              _buildMenuCard(
+                context,
+                'Medications',
+                Icons.medication,
+                () => Navigator.pushNamed(context, '/medications'),
+              ),
+              _buildMenuCard(
+                context,
+                'Reports',
+                Icons.assessment,
+                () => Navigator.pushNamed(context, '/reports'),
+              ),
+              _buildMenuCard(
+                context,
+                'Settings',
+                Icons.settings,
+                () => Navigator.pushNamed(context, '/settings'),
+              ),
+            ],
           ),
-        ),
-        _buildMenuCard(
-          context,
-          'Medication',
-          Icons.medication,
-          () {
-            // TODO: Implement medication
-          },
-        ),
-      ],
+        ],
+      ),
     );
   }
 

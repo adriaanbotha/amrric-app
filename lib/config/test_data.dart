@@ -29,107 +29,49 @@ import 'package:json_annotation/json_annotation.dart';
 import 'dart:convert';
 
 Future<void> resetTestData() async {
-  debugPrint('Resetting test data...');
-  
   try {
-    // Instead of using flushdb, we'll delete keys by type
-    final allKeys = await UpstashConfig.redis.keys('*');
-    debugPrint('Found ${allKeys.length} keys to delete');
-    
-    for (final key in allKeys) {
-      try {
-        // Get the type of the key
-        final keyType = await UpstashConfig.redis.type(key);
-        debugPrint('Key $key has type: $keyType');
-        
-        // Delete based on type
-        switch (keyType) {
-          case 'string':
-            await UpstashConfig.redis.del([key]);
-            break;
-          case 'hash':
-            await UpstashConfig.redis.del([key]);
-            break;
-          case 'set':
-            await UpstashConfig.redis.del([key]);
-            break;
-          default:
-            debugPrint('Unknown type for key $key: $keyType');
-            await UpstashConfig.redis.del([key]);
-        }
-      } catch (e) {
-        debugPrint('Error deleting key $key: $e');
-        // Continue with other keys even if one fails
-      }
-    }
-    
-    // Wait a moment to ensure all deletes are processed
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Verify all keys are deleted
-    final remainingKeys = await UpstashConfig.redis.keys('*');
-    if (remainingKeys.isEmpty) {
-      debugPrint('All keys successfully deleted');
-    } else {
-      debugPrint('Warning: ${remainingKeys.length} keys remaining: $remainingKeys');
-    }
-    
-    // Recreate test data
-    await createTestData();
-    debugPrint('Test data reset completed');
-  } catch (e, stack) {
+    await UpstashConfig.redis.flushall();
+  } catch (e) {
     debugPrint('Error resetting test data: $e');
-    debugPrint('Stack trace: $stack');
     rethrow;
   }
 }
 
 Future<void> createTestData() async {
-  debugPrint('Starting test data creation...');
   try {
-    // Check if data already exists
-    final hasUsers = await UpstashConfig.redis.exists(['user:admin@amrric.com']);
-    final hasCouncils = await UpstashConfig.redis.exists(['council:council1']);
-    final hasAnimals = await UpstashConfig.redis.exists(['animals']);
-
-    if (hasUsers == 0) {
-      debugPrint('No users found, creating test users...');
-      await createTestUsers();
-      debugPrint('Users created successfully');
-    } else {
-      debugPrint('Users already exist, skipping creation');
-    }
+    debugPrint('Starting test data creation...');
     
-    if (hasCouncils == 0) {
-      debugPrint('No councils found, creating test councils...');
-      await createTestCouncils();
-      debugPrint('Councils created successfully');
-    } else {
-      debugPrint('Councils already exist, skipping creation');
-    }
+    // First, reset all data
+    await resetTestData();
+    debugPrint('Reset all data');
     
-    final locationService = LocationService();
-    final locations = await locationService.getLocations();
-    if (locations.isEmpty) {
-      debugPrint('No locations found, creating test locations...');
-      await TestData.createTestLocations(locationService);
-      debugPrint('Locations created successfully');
-    } else {
-      debugPrint('Locations already exist, skipping creation');
-    }
+    // Create test users
+    await createTestUsers();
+    debugPrint('Created test users');
     
-    if (hasAnimals == 0) {
-      debugPrint('No animals found, creating test animals...');
-      await createTestAnimals();
-      debugPrint('Animals created successfully');
-    } else {
-      debugPrint('Animals already exist, skipping creation');
-    }
+    // Create test councils
+    await createTestCouncils();
+    debugPrint('Created test councils');
     
+    // Create test locations
+    await createTestLocations();
+    debugPrint('Created test locations');
+    
+    // Create test animals
+    await createTestAnimals();
+    debugPrint('Created test animals');
+    
+    // Create test reports
+    await createTestReports();
+    debugPrint('Created test reports');
+    
+    // Verify all data was created
     await verifyTestData();
-    debugPrint('Test data verification completed');
+    debugPrint('Verified all test data');
+    
+    debugPrint('All test data created successfully');
   } catch (e, stack) {
-    debugPrint('Error in createTestData: $e');
+    debugPrint('Error creating test data: $e');
     debugPrint('Stack trace: $stack');
     rethrow;
   }
@@ -302,6 +244,72 @@ Future<void> createTestUsers() async {
         }
       ],
     },
+    {
+      'id': '5',
+      'email': 'vet2@amrric.com',
+      'name': 'Dr. Sarah Johnson',
+      'role': UserRole.veterinaryUser,
+      'lastLogin': DateTime.now(),
+      'isActive': true,
+      'loginAttempts': 0,
+      'activityLog': <Map<String, dynamic>>[
+        {
+          'timestamp': DateTime.now().toIso8601String(),
+          'action': 'account_created',
+          'details': 'Test account created',
+        }
+      ],
+    },
+    {
+      'id': '6',
+      'email': 'municipal2@amrric.com',
+      'name': 'John Smith',
+      'role': UserRole.municipalityAdmin,
+      'lastLogin': DateTime.now(),
+      'isActive': true,
+      'loginAttempts': 0,
+      'activityLog': <Map<String, dynamic>>[
+        {
+          'timestamp': DateTime.now().toIso8601String(),
+          'action': 'account_created',
+          'details': 'Test account created',
+        }
+      ],
+      'councilId': 'council2',
+    },
+    {
+      'id': '7',
+      'email': 'census2@amrric.com',
+      'name': 'Emma Wilson',
+      'role': UserRole.censusUser,
+      'lastLogin': DateTime.now(),
+      'isActive': true,
+      'loginAttempts': 0,
+      'activityLog': <Map<String, dynamic>>[
+        {
+          'timestamp': DateTime.now().toIso8601String(),
+          'action': 'account_created',
+          'details': 'Test account created',
+        }
+      ],
+    },
+    {
+      'id': '8',
+      'email': 'municipal3@amrric.com',
+      'name': 'Michael Brown',
+      'role': UserRole.municipalityAdmin,
+      'lastLogin': DateTime.now(),
+      'isActive': true,
+      'loginAttempts': 0,
+      'activityLog': <Map<String, dynamic>>[
+        {
+          'timestamp': DateTime.now().toIso8601String(),
+          'action': 'account_created',
+          'details': 'Test account created',
+        }
+      ],
+      'councilId': 'council3',
+    }
   ];
 
   for (final user in users) {
@@ -372,8 +380,9 @@ Future<void> createTestCouncils() async {
 
     final now = DateTime.now();
     final councils = [
+      // Northern Territory
       Council(
-        id: 'council1',
+        id: 'council_nt_001',
         name: 'Darwin City Council',
         state: 'NT',
         imageUrl: 'https://picsum.photos/200/300?random=1',
@@ -382,7 +391,7 @@ Future<void> createTestCouncils() async {
         updatedAt: now,
       ),
       Council(
-        id: 'council2',
+        id: 'council_nt_002',
         name: 'Alice Springs Town Council',
         state: 'NT',
         imageUrl: 'https://picsum.photos/200/300?random=2',
@@ -391,7 +400,7 @@ Future<void> createTestCouncils() async {
         updatedAt: now,
       ),
       Council(
-        id: 'council3',
+        id: 'council_nt_003',
         name: 'Katherine Town Council',
         state: 'NT',
         imageUrl: 'https://picsum.photos/200/300?random=3',
@@ -400,7 +409,7 @@ Future<void> createTestCouncils() async {
         updatedAt: now,
       ),
       Council(
-        id: 'council4',
+        id: 'council_nt_004',
         name: 'Palmerston City Council',
         state: 'NT',
         imageUrl: 'https://picsum.photos/200/300?random=4',
@@ -409,7 +418,7 @@ Future<void> createTestCouncils() async {
         updatedAt: now,
       ),
       Council(
-        id: 'council5',
+        id: 'council_nt_005',
         name: 'Litchfield Council',
         state: 'NT',
         imageUrl: 'https://picsum.photos/200/300?random=5',
@@ -417,34 +426,315 @@ Future<void> createTestCouncils() async {
         createdAt: now,
         updatedAt: now,
       ),
+
+      // Queensland
+      Council(
+        id: 'council_qld_001',
+        name: 'Brisbane City Council',
+        state: 'QLD',
+        imageUrl: 'https://picsum.photos/200/300?random=6',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_qld_002',
+        name: 'Gold Coast City Council',
+        state: 'QLD',
+        imageUrl: 'https://picsum.photos/200/300?random=7',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_qld_003',
+        name: 'Sunshine Coast Regional Council',
+        state: 'QLD',
+        imageUrl: 'https://picsum.photos/200/300?random=8',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_qld_004',
+        name: 'Townsville City Council',
+        state: 'QLD',
+        imageUrl: 'https://picsum.photos/200/300?random=9',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_qld_005',
+        name: 'Cairns Regional Council',
+        state: 'QLD',
+        imageUrl: 'https://picsum.photos/200/300?random=10',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+
+      // New South Wales
+      Council(
+        id: 'council_nsw_001',
+        name: 'City of Sydney',
+        state: 'NSW',
+        imageUrl: 'https://picsum.photos/200/300?random=11',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_nsw_002',
+        name: 'City of Parramatta',
+        state: 'NSW',
+        imageUrl: 'https://picsum.photos/200/300?random=12',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_nsw_003',
+        name: 'City of Newcastle',
+        state: 'NSW',
+        imageUrl: 'https://picsum.photos/200/300?random=13',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_nsw_004',
+        name: 'Wollongong City Council',
+        state: 'NSW',
+        imageUrl: 'https://picsum.photos/200/300?random=14',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_nsw_005',
+        name: 'Central Coast Council',
+        state: 'NSW',
+        imageUrl: 'https://picsum.photos/200/300?random=15',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+
+      // Victoria
+      Council(
+        id: 'council_vic_001',
+        name: 'City of Melbourne',
+        state: 'VIC',
+        imageUrl: 'https://picsum.photos/200/300?random=16',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_vic_002',
+        name: 'City of Geelong',
+        state: 'VIC',
+        imageUrl: 'https://picsum.photos/200/300?random=17',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_vic_003',
+        name: 'City of Ballarat',
+        state: 'VIC',
+        imageUrl: 'https://picsum.photos/200/300?random=18',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_vic_004',
+        name: 'City of Bendigo',
+        state: 'VIC',
+        imageUrl: 'https://picsum.photos/200/300?random=19',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_vic_005',
+        name: 'City of Greater Shepparton',
+        state: 'VIC',
+        imageUrl: 'https://picsum.photos/200/300?random=20',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+
+      // Western Australia
+      Council(
+        id: 'council_wa_001',
+        name: 'City of Perth',
+        state: 'WA',
+        imageUrl: 'https://picsum.photos/200/300?random=21',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_wa_002',
+        name: 'City of Fremantle',
+        state: 'WA',
+        imageUrl: 'https://picsum.photos/200/300?random=22',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_wa_003',
+        name: 'City of Bunbury',
+        state: 'WA',
+        imageUrl: 'https://picsum.photos/200/300?random=23',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_wa_004',
+        name: 'City of Geraldton',
+        state: 'WA',
+        imageUrl: 'https://picsum.photos/200/300?random=24',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_wa_005',
+        name: 'City of Kalgoorlie-Boulder',
+        state: 'WA',
+        imageUrl: 'https://picsum.photos/200/300?random=25',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+
+      // South Australia
+      Council(
+        id: 'council_sa_001',
+        name: 'City of Adelaide',
+        state: 'SA',
+        imageUrl: 'https://picsum.photos/200/300?random=26',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_sa_002',
+        name: 'City of Mount Gambier',
+        state: 'SA',
+        imageUrl: 'https://picsum.photos/200/300?random=27',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_sa_003',
+        name: 'City of Whyalla',
+        state: 'SA',
+        imageUrl: 'https://picsum.photos/200/300?random=28',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_sa_004',
+        name: 'City of Port Augusta',
+        state: 'SA',
+        imageUrl: 'https://picsum.photos/200/300?random=29',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_sa_005',
+        name: 'City of Port Pirie',
+        state: 'SA',
+        imageUrl: 'https://picsum.photos/200/300?random=30',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+
+      // Tasmania
+      Council(
+        id: 'council_tas_001',
+        name: 'City of Hobart',
+        state: 'TAS',
+        imageUrl: 'https://picsum.photos/200/300?random=31',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_tas_002',
+        name: 'City of Launceston',
+        state: 'TAS',
+        imageUrl: 'https://picsum.photos/200/300?random=32',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_tas_003',
+        name: 'City of Devonport',
+        state: 'TAS',
+        imageUrl: 'https://picsum.photos/200/300?random=33',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_tas_004',
+        name: 'City of Burnie',
+        state: 'TAS',
+        imageUrl: 'https://picsum.photos/200/300?random=34',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Council(
+        id: 'council_tas_005',
+        name: 'City of Clarence',
+        state: 'TAS',
+        imageUrl: 'https://picsum.photos/200/300?random=35',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+
+      // Australian Capital Territory
+      Council(
+        id: 'council_act_001',
+        name: 'ACT Government',
+        state: 'ACT',
+        imageUrl: 'https://picsum.photos/200/300?random=36',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
     ];
 
-    // Verify and create/update councils
+    // First, clear any existing council data
+    final existingKeys = await redis.keys('council:*');
+    if (existingKeys.isNotEmpty) {
+      await redis.del(existingKeys);
+    }
+    await redis.del(['councils']);
+
+    // Create councils
     for (final council in councils) {
       try {
         final key = 'council:${council.id}';
-        final locationsKey = 'council:${council.id}:locations';
-        
-        // Check if this specific council exists
-        final exists = await redis.exists([key]);
-        if (exists > 0) {
-          debugPrint('Council ${council.name} exists, verifying data...');
-          final councilData = await redis.hgetall(key);
-          if (councilData != null && councilData.isNotEmpty) {
-            debugPrint('Council ${council.name} data verified: $councilData');
-            // Ensure locations set exists and is the correct type
-            final type = await redis.type(locationsKey);
-            if (type != 'set') {
-              debugPrint('Recreating locations set for council ${council.name}');
-              await redis.del([locationsKey]);
-              await redis.sadd(locationsKey, []);
-            }
-            continue;
-          }
-        }
-
-        debugPrint('Creating/updating council: ${council.name}');
         final data = council.toJson();
+        
+        // Convert all values to strings for Redis
         final redisData = data.map((key, value) {
           if (value == null) {
             return MapEntry(key, '');
@@ -462,31 +752,16 @@ Future<void> createTestCouncils() async {
         await redis.hset(key, redisData);
         await redis.sadd('councils', [council.id]);
         
-        // Initialize empty locations set for the council
-        await redis.del([locationsKey]);
-        await redis.sadd(locationsKey, []);
-        
-        // Verify the council was created/updated
-        final storedData = await redis.hgetall(key);
-        if (storedData == null || storedData.isEmpty) {
-          throw Exception('Council ${council.name} was created but has no data');
-        }
-        debugPrint('Council ${council.name} created/updated successfully: $storedData');
-      } catch (e, stack) {
-        debugPrint('Error creating/updating council ${council.name}: $e');
-        debugPrint('Stack trace: $stack');
+        debugPrint('Council ${council.name} created successfully');
+      } catch (e) {
+        debugPrint('Error creating council ${council.name}: $e');
         rethrow;
       }
     }
 
-    // Verify all councils are in the councils set
-    final councilSet = await redis.smembers('councils');
-    debugPrint('Councils set contains: $councilSet');
-    
-    debugPrint('Test councils creation/verification completed');
-  } catch (e, stack) {
+    debugPrint('All test councils created successfully');
+  } catch (e) {
     debugPrint('Error creating test councils: $e');
-    debugPrint('Stack trace: $stack');
     rethrow;
   }
 }
@@ -495,92 +770,714 @@ Future<void> createTestAnimals() async {
   debugPrint('Creating test animals...');
   
   try {
-    // Check if test animal exists
-    final testAnimalKey = 'animal:animal1';
-    final exists = await UpstashConfig.redis.exists([testAnimalKey]);
+    final redis = UpstashConfig.redis;
     
-    if (exists > 0) {
-      debugPrint('Test animal already exists, verifying data...');
-      final animalData = await UpstashConfig.redis.hgetall(testAnimalKey);
-      if (animalData != null && animalData.isNotEmpty) {
-        debugPrint('Test animal data verified: $animalData');
-        return;
-      }
+    // First, clear any existing animal data
+    final existingKeys = await redis.keys('animal:*');
+    if (existingKeys.isNotEmpty) {
+      await redis.del(existingKeys);
     }
-    
-    debugPrint('Creating test animal...');
-    final animal = {
-      'id': 'animal1',
-      'name': 'Rex',
-      'species': 'Dog',
-      'breed': 'German Shepherd',
-      'color': 'Black and Tan',
-      'sex': 'Male',
-      'estimatedAge': 3,
-      'weight': 35.5,
-      'microchipNumber': '123456789',
-      'registrationDate': DateTime.now().toIso8601String(),
-      'lastUpdated': DateTime.now().toIso8601String(),
-      'isActive': true,
-      'houseId': 'house1',
-      'locationId': 'location_6',  // Match census user's location
-      'councilId': 'council1',     // Match test council
-      'photoUrls': <String>[],
-      'medicalHistory': {
-        'treatments': [
-          {
-            'date': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
-            'type': 'Dental Cleaning',
-            'notes': 'Regular dental checkup and cleaning'
-          }
-        ],
-        'medications': [
-          {
-            'name': 'Heartworm Prevention',
-            'startDate': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
-            'endDate': DateTime.now().add(const Duration(days: 15)).toIso8601String(),
-            'dosage': '1 tablet monthly'
-          }
-        ]
-      }
-    };
+    await redis.del(['animals']);
 
-    // Create the animal object
-    final animalObj = Animal.fromJson(animal);
-    
-    // Convert to Redis format - ensure all values are strings
-    final redisData = <String, String>{};
-    final jsonData = animalObj.toJson();
-    jsonData.forEach((key, value) {
-      if (value == null) {
-        redisData[key] = '';
-      } else if (value is DateTime) {
-        redisData[key] = value.toIso8601String();
-      } else if (value is bool) {
-        redisData[key] = value.toString();
-      } else if (value is List || value is Map) {
-        redisData[key] = jsonEncode(value);
-      } else {
-        redisData[key] = value.toString();
+    final animals = [
+      {
+        'id': 'animal1',
+        'name': 'Rex',
+        'species': 'Dog',
+        'breed': 'German Shepherd',
+        'color': 'Black and Tan',
+        'sex': 'Male',
+        'estimatedAge': 3,
+        'weight': 35.5,
+        'microchipNumber': '123456789',
+        'registrationDate': DateTime.now().toIso8601String(),
+        'lastUpdated': DateTime.now().toIso8601String(),
+        'isActive': true,
+        'houseId': 'house1',
+        'locationId': 'location_001',
+        'councilId': 'council1',
+        'photoUrls': ['https://picsum.photos/200/300?random=1'],
+        'medicalHistory': {
+          'treatments': [
+            {
+              'id': 'treatment1',
+              'date': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+              'type': 'Vaccination',
+              'notes': 'Annual vaccination',
+              'medication': 'DHPP',
+              'dosage': '1ml',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+            },
+            {
+              'id': 'treatment2',
+              'date': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+              'type': 'Medication',
+              'notes': 'Heartworm prevention',
+              'medication': 'Heartgard Plus',
+              'dosage': '1 chewable tablet',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+            },
+            {
+              'id': 'treatment3',
+              'date': DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
+              'type': 'Procedure',
+              'notes': 'Dental cleaning',
+              'medication': 'None',
+              'dosage': 'N/A',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
+            },
+            {
+              'id': 'treatment4',
+              'date': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+              'type': 'Medication',
+              'notes': 'Joint supplement for hip dysplasia',
+              'medication': 'Dasuquin',
+              'dosage': '2 chewable tablets',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+            }
+          ],
+          'medications': {
+            'current': [
+              {
+                'id': 'med1',
+                'name': 'Heartgard Plus',
+                'type': 'Preventive',
+                'startDate': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 15)).toIso8601String(),
+                'dosage': '1 chewable tablet',
+                'frequency': 'Monthly',
+                'notes': 'Heartworm prevention',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 15)).toIso8601String()
+              },
+              {
+                'id': 'med2',
+                'name': 'Rimadyl',
+                'type': 'Pain Management',
+                'startDate': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
+                'dosage': '75mg',
+                'frequency': 'Twice daily',
+                'notes': 'For hip dysplasia pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(hours: 12)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(hours: 12)).toIso8601String()
+              },
+              {
+                'id': 'med3',
+                'name': 'Dasuquin',
+                'type': 'Supplement',
+                'startDate': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 27)).toIso8601String(),
+                'dosage': '2 chewable tablets',
+                'frequency': 'Daily',
+                'notes': 'Joint health supplement for hip dysplasia',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 0)).toIso8601String()
+              }
+            ],
+            'history': [
+              {
+                'id': 'med4',
+                'name': 'Amoxicillin',
+                'type': 'Antibiotic',
+                'startDate': DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+                'dosage': '500mg',
+                'frequency': 'Twice daily',
+                'notes': 'For skin infection',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              },
+              {
+                'id': 'med5',
+                'name': 'Prednisone',
+                'type': 'Anti-inflammatory',
+                'startDate': DateTime.now().subtract(const Duration(days: 90)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 75)).toIso8601String(),
+                'dosage': '20mg',
+                'frequency': 'Once daily',
+                'notes': 'For allergic reaction',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              },
+              {
+                'id': 'med6',
+                'name': 'Tramadol',
+                'type': 'Pain Management',
+                'startDate': DateTime.now().subtract(const Duration(days: 120)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 110)).toIso8601String(),
+                'dosage': '50mg',
+                'frequency': 'Every 8 hours',
+                'notes': 'Post-surgery pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              }
+            ]
+          },
+          'allergies': ['Penicillin', 'Sulfa drugs'],
+          'chronicConditions': ['Mild hip dysplasia', 'Seasonal allergies'],
+          'lastCheckup': DateTime.now().subtract(const Duration(days: 30)).toIso8601String()
+        }
+      },
+      {
+        'id': 'animal2',
+        'name': 'Luna',
+        'species': 'Cat',
+        'breed': 'Siamese',
+        'color': 'Cream',
+        'sex': 'Female',
+        'estimatedAge': 2,
+        'weight': 4.2,
+        'microchipNumber': '987654321',
+        'registrationDate': DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
+        'lastUpdated': DateTime.now().toIso8601String(),
+        'isActive': true,
+        'houseId': 'house2',
+        'locationId': 'location_002',
+        'councilId': 'council1',
+        'photoUrls': ['https://picsum.photos/200/300?random=2'],
+        'medicalHistory': {
+          'treatments': [
+            {
+              'id': 'treatment4',
+              'date': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+              'type': 'Vaccination',
+              'notes': 'Annual vaccination',
+              'medication': 'FVRCP',
+              'dosage': '1ml',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+            },
+            {
+              'id': 'treatment5',
+              'date': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+              'type': 'Medication',
+              'notes': 'Flea and tick prevention',
+              'medication': 'Frontline Plus',
+              'dosage': '0.5ml topical',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+            },
+            {
+              'id': 'treatment6',
+              'date': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+              'type': 'Procedure',
+              'notes': 'Spay surgery',
+              'medication': 'None',
+              'dosage': 'N/A',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+            },
+            {
+              'id': 'treatment7',
+              'date': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+              'type': 'Medication',
+              'notes': 'Dental health supplement',
+              'medication': 'Dental Fresh',
+              'dosage': '1ml in water',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+            }
+          ],
+          'medications': {
+            'current': [
+              {
+                'id': 'med5',
+                'name': 'Frontline Plus',
+                'type': 'Preventive',
+                'startDate': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 10)).toIso8601String(),
+                'dosage': '0.5ml topical',
+                'frequency': 'Monthly',
+                'notes': 'Flea and tick prevention',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 10)).toIso8601String()
+              },
+              {
+                'id': 'med6',
+                'name': 'Metacam',
+                'type': 'Pain Management',
+                'startDate': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 4)).toIso8601String(),
+                'dosage': '0.5ml',
+                'frequency': 'Once daily',
+                'notes': 'Post-spay pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 0)).toIso8601String()
+              },
+              {
+                'id': 'med7',
+                'name': 'Dental Fresh',
+                'type': 'Supplement',
+                'startDate': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 25)).toIso8601String(),
+                'dosage': '1ml',
+                'frequency': 'Daily',
+                'notes': 'Dental health maintenance',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 0)).toIso8601String()
+              }
+            ],
+            'history': [
+              {
+                'id': 'med8',
+                'name': 'Clavamox',
+                'type': 'Antibiotic',
+                'startDate': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 23)).toIso8601String(),
+                'dosage': '62.5mg',
+                'frequency': 'Twice daily',
+                'notes': 'Post-spay infection prevention',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              },
+              {
+                'id': 'med9',
+                'name': 'Buprenorphine',
+                'type': 'Pain Management',
+                'startDate': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 8)).toIso8601String(),
+                'dosage': '0.1ml',
+                'frequency': 'Every 8 hours',
+                'notes': 'Post-spay pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              }
+            ]
+          },
+          'allergies': ['None known'],
+          'chronicConditions': ['None'],
+          'lastCheckup': DateTime.now().subtract(const Duration(days: 45)).toIso8601String()
+        }
+      },
+      {
+        'id': 'animal3',
+        'name': 'Rocky',
+        'species': 'Dog',
+        'breed': 'Labrador Retriever',
+        'color': 'Chocolate',
+        'sex': 'Male',
+        'estimatedAge': 4,
+        'weight': 32.0,
+        'microchipNumber': '456789123',
+        'registrationDate': DateTime.now().subtract(const Duration(days: 90)).toIso8601String(),
+        'lastUpdated': DateTime.now().toIso8601String(),
+        'isActive': true,
+        'houseId': 'house3',
+        'locationId': 'location_003',
+        'councilId': 'council1',
+        'photoUrls': ['https://picsum.photos/200/300?random=3'],
+        'medicalHistory': {
+          'treatments': [
+            {
+              'id': 'treatment7',
+              'date': DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
+              'type': 'Vaccination',
+              'notes': 'Annual vaccination',
+              'medication': 'DHPP + Rabies',
+              'dosage': '1ml each',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
+            },
+            {
+              'id': 'treatment8',
+              'date': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+              'type': 'Medication',
+              'notes': 'Joint supplement',
+              'medication': 'Glucosamine',
+              'dosage': '500mg daily',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+            },
+            {
+              'id': 'treatment9',
+              'date': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+              'type': 'Procedure',
+              'notes': 'Ear infection treatment',
+              'medication': 'Ear drops',
+              'dosage': '2 drops twice daily',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+            },
+            {
+              'id': 'treatment10',
+              'date': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+              'type': 'Medication',
+              'notes': 'Anti-inflammatory for arthritis',
+              'medication': 'Meloxicam',
+              'dosage': '1.5mg',
+              'userId': 'vet@amrric.com',
+              'createdAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+              'updatedAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+            }
+          ],
+          'medications': {
+            'current': [
+              {
+                'id': 'med8',
+                'name': 'Glucosamine',
+                'type': 'Supplement',
+                'startDate': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+                'dosage': '500mg',
+                'frequency': 'Daily',
+                'notes': 'Joint health maintenance',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 0)).toIso8601String()
+              },
+              {
+                'id': 'med9',
+                'name': 'Otomax',
+                'type': 'Antibiotic',
+                'startDate': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
+                'dosage': '2 drops',
+                'frequency': 'Twice daily',
+                'notes': 'Ear infection treatment',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(hours: 12)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(hours: 12)).toIso8601String()
+              },
+              {
+                'id': 'med10',
+                'name': 'Meloxicam',
+                'type': 'Anti-inflammatory',
+                'startDate': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+                'endDate': DateTime.now().add(const Duration(days: 28)).toIso8601String(),
+                'dosage': '1.5mg',
+                'frequency': 'Once daily',
+                'notes': 'Arthritis pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'lastAdministered': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+                'nextDue': DateTime.now().add(const Duration(days: 0)).toIso8601String()
+              }
+            ],
+            'history': [
+              {
+                'id': 'med11',
+                'name': 'Carprofen',
+                'type': 'Pain Management',
+                'startDate': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+                'dosage': '75mg',
+                'frequency': 'Once daily',
+                'notes': 'Post-surgery pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              },
+              {
+                'id': 'med12',
+                'name': 'Cephalexin',
+                'type': 'Antibiotic',
+                'startDate': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 38)).toIso8601String(),
+                'dosage': '500mg',
+                'frequency': 'Twice daily',
+                'notes': 'Post-surgery infection prevention',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              },
+              {
+                'id': 'med13',
+                'name': 'Tramadol',
+                'type': 'Pain Management',
+                'startDate': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
+                'endDate': DateTime.now().subtract(const Duration(days: 40)).toIso8601String(),
+                'dosage': '50mg',
+                'frequency': 'Every 8 hours',
+                'notes': 'Post-surgery pain management',
+                'prescribedBy': 'vet@amrric.com',
+                'status': 'Completed'
+              }
+            ]
+          },
+          'allergies': ['Chicken', 'Corn', 'Soy'],
+          'chronicConditions': ['Mild arthritis', 'Food sensitivities'],
+          'lastCheckup': DateTime.now().subtract(const Duration(days: 60)).toIso8601String()
+        }
       }
-    });
-    
-    // Store the animal data
-    await UpstashConfig.redis.hset(testAnimalKey, redisData);
-    
-    // Add to animals set
-    await UpstashConfig.redis.sadd('animals', ['animal1']);
-    
-    // Verify the animal was created
-    final storedData = await UpstashConfig.redis.hgetall(testAnimalKey);
-    if (storedData == null || storedData.isEmpty) {
-      throw Exception('Test animal was created but has no data');
+    ];
+
+    for (final animal in animals) {
+      try {
+        final animalKey = 'animal:${animal['id']}';
+        
+        // Convert all values to strings for Redis
+        final redisData = animal.map((key, value) {
+          if (value == null) {
+            return MapEntry(key, '');
+          } else if (value is DateTime) {
+            return MapEntry(key, value.toIso8601String());
+          } else if (value is bool) {
+            return MapEntry(key, value.toString());
+          } else if (value is List || value is Map) {
+            return MapEntry(key, jsonEncode(value));
+          } else {
+            return MapEntry(key, value.toString());
+          }
+        });
+        
+        await redis.hset(animalKey, redisData);
+        await redis.sadd('animals', [animal['id']]);
+        
+        debugPrint('Animal ${animal['name']} created successfully');
+      } catch (e) {
+        debugPrint('Error creating animal ${animal['name']}: $e');
+        rethrow;
+      }
     }
     
-    debugPrint('Test animal created successfully: $storedData');
-  } catch (e, stack) {
-    debugPrint('Error in createTestAnimals: $e');
-    debugPrint('Stack trace: $stack');
+    debugPrint('All test animals created successfully');
+  } catch (e) {
+    debugPrint('Error creating test animals: $e');
+    rethrow;
+  }
+}
+
+Future<void> createTestReports() async {
+  try {
+    final redis = UpstashConfig.redis;
+    final reports = [
+      {
+        'id': 'report_001',
+        'type': 'census',
+        'title': 'Monthly Animal Census Report - March 2024',
+        'description': 'Monthly report of all registered animals in Darwin CBD',
+        'councilId': 'council1',
+        'locationId': 'location_001',
+        'createdBy': 'census@amrric.com',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'status': 'completed',
+        'data': {
+          'totalAnimals': 150,
+          'bySpecies': {
+            'dog': 80,
+            'cat': 60,
+            'other': 10
+          },
+          'byLocation': {
+            'Darwin CBD': 100,
+            'Nightcliff': 30,
+            'Bagot Community': 20
+          },
+          'vaccinationStatus': {
+            'upToDate': 120,
+            'overdue': 30
+          },
+          'microchipStatus': {
+            'chipped': 140,
+            'notChipped': 10
+          },
+          'healthStatus': {
+            'healthy': 130,
+            'needsAttention': 20
+          },
+          'ageDistribution': {
+            'under1': 20,
+            '1to3': 50,
+            '3to7': 60,
+            'over7': 20
+          }
+        }
+      },
+      {
+        'id': 'report_002',
+        'type': 'treatment',
+        'title': 'Q1 Treatment Summary - 2024',
+        'description': 'Summary of all treatments performed in Q1 2024',
+        'councilId': 'council1',
+        'locationId': 'location_001',
+        'createdBy': 'vet@amrric.com',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'status': 'completed',
+        'data': {
+          'totalTreatments': 45,
+          'byType': {
+            'vaccination': 30,
+            'dental': 10,
+            'surgery': 5
+          },
+          'bySpecies': {
+            'dog': 25,
+            'cat': 20
+          },
+          'successRate': 0.95,
+          'commonIssues': [
+            'Dental disease',
+            'Vaccination overdue',
+            'Minor injuries'
+          ],
+          'medicationUsage': {
+            'heartworm': 25,
+            'flea': 30,
+            'worm': 20
+          },
+          'treatmentOutcomes': {
+            'successful': 43,
+            'followup': 2
+          },
+          'costAnalysis': {
+            'total': 4500.00,
+            'average': 100.00,
+            'byType': {
+              'vaccination': 1500.00,
+              'dental': 2000.00,
+              'surgery': 1000.00
+            }
+          }
+        }
+      },
+      {
+        'id': 'report_003',
+        'type': 'incident',
+        'title': 'Animal Control Incidents Report - March 2024',
+        'description': 'Report of animal control incidents in Darwin CBD',
+        'councilId': 'council1',
+        'locationId': 'location_001',
+        'createdBy': 'municipal@amrric.com',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'status': 'completed',
+        'data': {
+          'totalIncidents': 20,
+          'byType': {
+            'stray': 10,
+            'aggressive': 5,
+            'injury': 5
+          },
+          'byLocation': {
+            'Darwin CBD': 12,
+            'Nightcliff': 5,
+            'Bagot Community': 3
+          },
+          'resolutionTime': {
+            'under1Hour': 15,
+            '1to4Hours': 5
+          },
+          'outcomes': {
+            'returned': 15,
+            'impounded': 5
+          },
+          'severity': {
+            'low': 12,
+            'medium': 6,
+            'high': 2
+          },
+          'responseTime': {
+            'under30min': 10,
+            '30to60min': 8,
+            'over60min': 2
+          },
+          'costAnalysis': {
+            'total': 2000.00,
+            'average': 100.00,
+            'byType': {
+              'stray': 1000.00,
+              'aggressive': 500.00,
+              'injury': 500.00
+            }
+          }
+        }
+      },
+      {
+        'id': 'report_004',
+        'type': 'health',
+        'title': 'Community Health Report - Q1 2024',
+        'description': 'Comprehensive health report for all animals in the community',
+        'councilId': 'council1',
+        'locationId': 'location_001',
+        'createdBy': 'vet@amrric.com',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'status': 'completed',
+        'data': {
+          'totalAnimals': 150,
+          'healthStatus': {
+            'excellent': 80,
+            'good': 50,
+            'fair': 15,
+            'poor': 5
+          },
+          'diseasePrevalence': {
+            'dental': 20,
+            'skin': 15,
+            'parasitic': 10,
+            'other': 5
+          },
+          'vaccinationCoverage': {
+            'complete': 120,
+            'partial': 20,
+            'none': 10
+          },
+          'preventiveCare': {
+            'heartworm': 130,
+            'flea': 140,
+            'worm': 125
+          },
+          'riskFactors': {
+            'age': {
+              'under1': 5,
+              '1to3': 10,
+              '3to7': 15,
+              'over7': 20
+            },
+            'species': {
+              'dog': 25,
+              'cat': 15
+            }
+          },
+          'recommendations': [
+            'Increase vaccination awareness',
+            'Implement dental care program',
+            'Enhance parasite prevention'
+          ]
+        }
+      }
+    ];
+
+    for (final report in reports) {
+      final reportKey = 'report:${report['id']}';
+      
+      // Convert all values to strings for Redis
+      final redisData = report.map((key, value) {
+        if (value is Map || value is List) {
+          return MapEntry(key, jsonEncode(value));
+        }
+        return MapEntry(key, value.toString());
+      });
+
+      await redis.hset(reportKey, redisData);
+      await redis.sadd('reports', [report['id']]);
+      debugPrint('Created test report: ${report['id']}');
+    }
+
+    debugPrint('All test reports created successfully');
+  } catch (e) {
+    debugPrint('Error creating test reports: $e');
     rethrow;
   }
 }
@@ -731,11 +1628,6 @@ Future<void> clearLocations() async {
 }
 
 class TestData {
-  static Future<void> createTestData(CouncilService councilService, LocationService locationService) async {
-    await createTestCouncils();
-    await createTestLocations(locationService);
-  }
-
   static Future<void> createTestLocations(LocationService locationService) async {
     final councils = await CouncilService().getCouncils();
     if (councils.isEmpty) {
@@ -745,8 +1637,10 @@ class TestData {
 
     final darwinCouncil = councils.firstWhere((c) => c.name == 'Darwin City Council');
     final aliceCouncil = councils.firstWhere((c) => c.name == 'Alice Springs Town Council');
+    final katherineCouncil = councils.firstWhere((c) => c.name == 'Katherine Town Council');
 
     final locations = [
+      // Darwin City Council locations
       Location.create().copyWith(
         name: 'Darwin CBD',
         altName: 'City Centre',
@@ -775,6 +1669,26 @@ class TestData {
         isActive: true,
       ),
       Location.create().copyWith(
+        name: 'Palmerston',
+        altName: 'Palmerston City',
+        code: 'DRW04',
+        locationTypeId: LocationType.urban,
+        councilId: darwinCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+      Location.create().copyWith(
+        name: 'Humpty Doo',
+        altName: null,
+        code: 'DRW05',
+        locationTypeId: LocationType.rural,
+        councilId: darwinCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+
+      // Alice Springs Town Council locations
+      Location.create().copyWith(
         name: 'Alice Springs CBD',
         altName: 'Town Centre',
         code: 'ASP01',
@@ -801,6 +1715,71 @@ class TestData {
         useLotNumber: false,
         isActive: true,
       ),
+      Location.create().copyWith(
+        name: 'Araluen',
+        altName: null,
+        code: 'ASP04',
+        locationTypeId: LocationType.urban,
+        councilId: aliceCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+      Location.create().copyWith(
+        name: 'East Side',
+        altName: 'East Side Community',
+        code: 'ASP05',
+        locationTypeId: LocationType.urban,
+        councilId: aliceCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+
+      // Katherine Town Council locations
+      Location.create().copyWith(
+        name: 'Katherine CBD',
+        altName: 'Town Centre',
+        code: 'KAT01',
+        locationTypeId: LocationType.urban,
+        councilId: katherineCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+      Location.create().copyWith(
+        name: 'Katherine East',
+        altName: null,
+        code: 'KAT02',
+        locationTypeId: LocationType.urban,
+        councilId: katherineCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+      Location.create().copyWith(
+        name: 'Katherine South',
+        altName: null,
+        code: 'KAT03',
+        locationTypeId: LocationType.urban,
+        councilId: katherineCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+      Location.create().copyWith(
+        name: 'Tindal',
+        altName: 'RAAF Base Tindal',
+        code: 'KAT04',
+        locationTypeId: LocationType.rural,
+        councilId: katherineCouncil.id,
+        useLotNumber: true,
+        isActive: true,
+      ),
+      Location.create().copyWith(
+        name: 'Binjari',
+        altName: 'Binjari Community',
+        code: 'KAT05',
+        locationTypeId: LocationType.indigenous,
+        councilId: katherineCouncil.id,
+        useLotNumber: false,
+        isActive: true,
+      ),
     ];
 
     for (final location in locations) {
@@ -811,5 +1790,351 @@ class TestData {
         print('Error adding test location ${location.name}: $e');
       }
     }
+  }
+}
+
+Future<void> createTestLocations() async {
+  try {
+    final redis = UpstashConfig.redis;
+    debugPrint('Creating test locations...');
+
+    // First, clear any existing location data
+    final existingKeys = await redis.keys('location:*');
+    if (existingKeys.isNotEmpty) {
+      await redis.del(existingKeys);
+    }
+    await redis.del(['locations']);
+
+    final locations = [
+      // Northern Territory Locations
+      {
+        'id': 'location_nt_001',
+        'name': 'Darwin CBD',
+        'altName': 'City Centre',
+        'code': 'DRW01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_nt_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_nt_002',
+        'name': 'Nightcliff',
+        'altName': null,
+        'code': 'DRW02',
+        'locationTypeId': 'urban',
+        'councilId': 'council_nt_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_nt_003',
+        'name': 'Bagot Community',
+        'altName': 'Bagot',
+        'code': 'DRW03',
+        'locationTypeId': 'indigenous',
+        'councilId': 'council_nt_001',
+        'useLotNumber': false,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_nt_004',
+        'name': 'Palmerston City',
+        'altName': 'Palmerston',
+        'code': 'PAL01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_nt_004',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_nt_005',
+        'name': 'Humpty Doo',
+        'altName': null,
+        'code': 'LIT01',
+        'locationTypeId': 'rural',
+        'councilId': 'council_nt_005',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // Queensland Locations
+      {
+        'id': 'location_qld_001',
+        'name': 'Brisbane CBD',
+        'altName': 'City Centre',
+        'code': 'BNE01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_qld_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_qld_002',
+        'name': 'South Bank',
+        'altName': null,
+        'code': 'BNE02',
+        'locationTypeId': 'urban',
+        'councilId': 'council_qld_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_qld_003',
+        'name': 'Surfers Paradise',
+        'altName': null,
+        'code': 'GCC01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_qld_002',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_qld_004',
+        'name': 'Maroochydore',
+        'altName': null,
+        'code': 'SSC01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_qld_003',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // New South Wales Locations
+      {
+        'id': 'location_nsw_001',
+        'name': 'Sydney CBD',
+        'altName': 'City Centre',
+        'code': 'SYD01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_nsw_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_nsw_002',
+        'name': 'Parramatta CBD',
+        'altName': 'City Centre',
+        'code': 'PRM01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_nsw_002',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_nsw_003',
+        'name': 'Newcastle CBD',
+        'altName': 'City Centre',
+        'code': 'NCL01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_nsw_003',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // Victoria Locations
+      {
+        'id': 'location_vic_001',
+        'name': 'Melbourne CBD',
+        'altName': 'City Centre',
+        'code': 'MEL01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_vic_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_vic_002',
+        'name': 'Geelong CBD',
+        'altName': 'City Centre',
+        'code': 'GEE01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_vic_002',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_vic_003',
+        'name': 'Ballarat CBD',
+        'altName': 'City Centre',
+        'code': 'BAL01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_vic_003',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // Western Australia Locations
+      {
+        'id': 'location_wa_001',
+        'name': 'Perth CBD',
+        'altName': 'City Centre',
+        'code': 'PER01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_wa_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_wa_002',
+        'name': 'Fremantle CBD',
+        'altName': 'City Centre',
+        'code': 'FRE01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_wa_002',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // South Australia Locations
+      {
+        'id': 'location_sa_001',
+        'name': 'Adelaide CBD',
+        'altName': 'City Centre',
+        'code': 'ADL01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_sa_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_sa_002',
+        'name': 'Mount Gambier CBD',
+        'altName': 'City Centre',
+        'code': 'MGB01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_sa_002',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // Tasmania Locations
+      {
+        'id': 'location_tas_001',
+        'name': 'Hobart CBD',
+        'altName': 'City Centre',
+        'code': 'HOB01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_tas_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_tas_002',
+        'name': 'Launceston CBD',
+        'altName': 'City Centre',
+        'code': 'LNC01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_tas_002',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+
+      // Australian Capital Territory Locations
+      {
+        'id': 'location_act_001',
+        'name': 'Canberra CBD',
+        'altName': 'City Centre',
+        'code': 'CBR01',
+        'locationTypeId': 'urban',
+        'councilId': 'council_act_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'location_act_002',
+        'name': 'Belconnen',
+        'altName': null,
+        'code': 'CBR02',
+        'locationTypeId': 'urban',
+        'councilId': 'council_act_001',
+        'useLotNumber': true,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    ];
+
+    for (final location in locations) {
+      try {
+        final locationKey = 'location:${location['id']}';
+        
+        // Convert all values to strings for Redis
+        final redisData = location.map((key, value) {
+          if (value == null) {
+            return MapEntry(key, '');
+          } else if (value is DateTime) {
+            return MapEntry(key, value.toIso8601String());
+          } else if (value is bool) {
+            return MapEntry(key, value.toString());
+          } else if (value is List || value is Map) {
+            return MapEntry(key, jsonEncode(value));
+          } else {
+            return MapEntry(key, value.toString());
+          }
+        });
+        
+        await redis.hset(locationKey, redisData);
+        await redis.sadd('locations', [location['id']]);
+        
+        // Add location to council's locations set
+        final councilLocationsKey = 'council:${location['councilId']}:locations';
+        await redis.sadd(councilLocationsKey, [location['id']]);
+        
+        debugPrint('Location ${location['name']} created successfully');
+      } catch (e) {
+        debugPrint('Error creating location ${location['name']}: $e');
+        rethrow;
+      }
+    }
+
+    debugPrint('All test locations created successfully');
+  } catch (e) {
+    debugPrint('Error creating test locations: $e');
+    rethrow;
   }
 } 

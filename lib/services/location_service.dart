@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:upstash_redis/upstash_redis.dart';
 import 'package:amrric_app/models/location.dart';
 import 'package:amrric_app/models/location_type.dart';
 import 'package:amrric_app/config/upstash_config.dart';
@@ -11,18 +10,35 @@ final locationsProvider = StateNotifierProvider<LocationService, AsyncValue<List
 });
 
 class LocationService extends StateNotifier<AsyncValue<List<Location>>> {
-  final Redis _redis = UpstashConfig.redis;
+  static const int _maxRetries = 3;
+  static const Duration _retryDelay = Duration(seconds: 1);
+  static const String _locationsKey = 'locations';
 
   LocationService() : super(const AsyncValue.loading()) {
-    loadLocations();
+    _loadLocations();
   }
 
-  Future<void> loadLocations() async {
+  Future<T> _withRetry<T>(Future<T> Function() operation) async {
+    int attempts = 0;
+    while (true) {
+      try {
+        attempts++;
+        return await operation();
+      } catch (e) {
+        if (attempts >= _maxRetries) {
+          debugPrint('Operation failed after $_maxRetries attempts: $e');
+          rethrow;
+        }
+        debugPrint('Operation failed, attempt $attempts of $_maxRetries: $e');
+        await Future.delayed(_retryDelay * attempts);
+      }
+    }
+  }
+
+  Future<void> _loadLocations() async {
     try {
-      debugPrint('Loading locations...');
       state = const AsyncValue.loading();
       final locations = await getLocations();
-      debugPrint('Loaded ${locations.length} locations');
       state = AsyncValue.data(locations);
     } catch (e, stack) {
       debugPrint('Error loading locations: $e\n$stack');
@@ -31,187 +47,229 @@ class LocationService extends StateNotifier<AsyncValue<List<Location>>> {
   }
 
   Future<void> addLocation(Location location) async {
-    try {
-      debugPrint('Adding location: ${location.name}');
-      if (!location.validate()) {
-        throw Exception('Invalid location data');
-      }
-
-      final data = location.toJson();
-      debugPrint('Location data: $data');
-      
-      // Convert all values to strings for Redis
-      final redisData = <String, String>{};
-      data.forEach((key, value) {
-        if (value != null) {
-          if (value is Map) {
-            redisData[key] = jsonEncode(value);
-          } else {
-            redisData[key] = value.toString();
-          }
+    await _withRetry(() async {
+      try {
+        debugPrint('Adding location: ${location.name}');
+        if (!location.validate()) {
+          throw Exception('Invalid location data');
         }
-      });
-      
-      debugPrint('Redis data: $redisData');
-      await _redis.hset('location:${location.id}', redisData);
-      await _redis.sadd('council:${location.councilId}:locations', [location.id]);
-      
-      // Update state immediately
-      state.whenData((locations) {
-        state = AsyncValue.data([...locations, location]);
-      });
-      debugPrint('Location added successfully');
-    } catch (e, stack) {
-      debugPrint('Error adding location: $e\n$stack');
-      rethrow;
-    }
+
+        final data = location.toJson();
+        debugPrint('Location data: $data');
+        
+        // Convert all values to strings for Redis
+        final redisData = <String, String>{};
+        data.forEach((key, value) {
+          if (value != null) {
+            if (value is Map) {
+              redisData[key] = jsonEncode(value);
+            } else {
+              redisData[key] = value.toString();
+            }
+          }
+        });
+        
+        debugPrint('Redis data: $redisData');
+        await UpstashConfig.redis.hset('location:${location.id}', redisData);
+        await UpstashConfig.redis.sadd('council:${location.councilId}:locations', [location.id]);
+        
+        // Update state immediately
+        state.whenData((locations) {
+          state = AsyncValue.data([...locations, location]);
+        });
+        debugPrint('Location added successfully');
+      } catch (e, stack) {
+        debugPrint('Error adding location: $e\n$stack');
+        rethrow;
+      }
+    });
   }
 
   Future<void> updateLocation(Location location) async {
-    try {
-      debugPrint('Updating location: ${location.name}');
-      if (!location.validate()) {
-        throw Exception('Invalid location data');
-      }
+    await _withRetry(() async {
+      try {
+        debugPrint('Updating location: ${location.name}');
+        if (!location.validate()) {
+          throw Exception('Invalid location data');
+        }
 
-      final data = location.toJson();
-      debugPrint('Location data: $data');
-      
-      // Convert all values to strings for Redis
-      final redisData = <String, String>{};
-      data.forEach((key, value) {
-        if (value != null) {
-          if (value is Map) {
-            redisData[key] = jsonEncode(value);
-          } else {
-            redisData[key] = value.toString();
+        final data = location.toJson();
+        debugPrint('Location data: $data');
+        
+        // Convert all values to strings for Redis
+        final redisData = <String, String>{};
+        data.forEach((key, value) {
+          if (value != null) {
+            if (value is Map) {
+              redisData[key] = jsonEncode(value);
+            } else {
+              redisData[key] = value.toString();
+            }
           }
-        }
-      });
-      
-      debugPrint('Redis data: $redisData');
-      await _redis.hset('location:${location.id}', redisData);
-      
-      // Update state immediately
-      state.whenData((locations) {
-        final index = locations.indexWhere((l) => l.id == location.id);
-        if (index != -1) {
-          final updatedLocations = List<Location>.from(locations);
-          updatedLocations[index] = location;
-          state = AsyncValue.data(updatedLocations);
-        }
-      });
-      debugPrint('Location updated successfully');
-    } catch (e, stack) {
-      debugPrint('Error updating location: $e\n$stack');
-      rethrow;
-    }
+        });
+        
+        debugPrint('Redis data: $redisData');
+        await UpstashConfig.redis.hset('location:${location.id}', redisData);
+        
+        // Update state immediately
+        state.whenData((locations) {
+          final index = locations.indexWhere((l) => l.id == location.id);
+          if (index != -1) {
+            final updatedLocations = List<Location>.from(locations);
+            updatedLocations[index] = location;
+            state = AsyncValue.data(updatedLocations);
+          }
+        });
+        debugPrint('Location updated successfully');
+      } catch (e, stack) {
+        debugPrint('Error updating location: $e\n$stack');
+        rethrow;
+      }
+    });
   }
 
   Future<void> deleteLocation(String id) async {
-    try {
-      final location = await getLocation(id);
-      if (location != null) {
-        await _redis.srem('council:${location.councilId}:locations', [id]);
-        await _redis.del(['location:$id']);
+    await _withRetry(() async {
+      try {
+        final locations = await getLocations();
+        final location = locations.firstWhere((l) => l.id == id);
+        await UpstashConfig.redis.srem('council:${location.councilId}:locations', [id]);
+        await UpstashConfig.redis.del(['location:$id']);
         
         // Update state immediately
         state.whenData((locations) {
           final updatedLocations = locations.where((l) => l.id != id).toList();
           state = AsyncValue.data(updatedLocations);
         });
+      } catch (e) {
+        debugPrint('Error deleting location: $e');
+        rethrow;
       }
-    } catch (e) {
-      print('Error deleting location: $e');
-      rethrow;
-    }
+    });
   }
 
   Future<List<Location>> getLocations() async {
-    try {
-      debugPrint('Getting all locations');
-      final keys = await _redis.keys('location:*');
-      debugPrint('Found ${keys.length} location keys');
-      final locations = <Location>[];
+    return _withRetry(() async {
+      try {
+        debugPrint('Getting all locations');
+        final keys = await UpstashConfig.redis.keys('location:*');
+        debugPrint('Found ${keys.length} location keys');
+        final locations = <Location>[];
 
-      for (final key in keys) {
-        try {
-          final data = await _redis.hgetall(key);
-          debugPrint('Location data for $key: $data');
-          if (data != null && data.isNotEmpty) {
-            // Convert Redis string values to appropriate types
-            final jsonData = <String, dynamic>{};
-            data.forEach((key, value) {
-              if (key == 'metadata' && value != null) {
-                try {
-                  jsonData[key] = jsonDecode(value);
-                } catch (e) {
-                  debugPrint('Error decoding metadata: $e');
-                  jsonData[key] = null;
+        for (final key in keys) {
+          try {
+            final data = await UpstashConfig.redis.hgetall(key);
+            debugPrint('Location data for $key: $data');
+            if (data != null && data.isNotEmpty) {
+              final jsonData = <String, dynamic>{};
+              data.forEach((key, value) {
+                if (key == 'metadata' && value != null) {
+                  try {
+                    jsonData[key] = jsonDecode(value);
+                  } catch (e) {
+                    debugPrint('Error decoding metadata: $e');
+                    jsonData[key] = null;
+                  }
+                } else {
+                  jsonData[key] = value;
                 }
-              } else {
-                jsonData[key] = value;
-              }
-            });
-            
-            locations.add(Location.fromJson(jsonData));
+              });
+              locations.add(Location.fromJson(jsonData));
+            }
+          } catch (e) {
+            debugPrint('Error processing location $key: $e');
+            continue;
           }
-        } catch (e) {
-          debugPrint('Error processing location $key: $e');
-          continue;
         }
+        return locations;
+      } catch (e, stack) {
+        debugPrint('Error getting locations: $e\n$stack');
+        rethrow;
       }
-
-      return locations;
-    } catch (e, stack) {
-      debugPrint('Error getting locations: $e\n$stack');
-      rethrow;
-    }
+    });
   }
 
   Future<Location?> getLocation(String id) async {
-    try {
-      debugPrint('Getting location: $id');
-      final data = await _redis.hgetall('location:$id');
-      if (data == null || data.isEmpty) return null;
-      
-      // Convert Redis string values to appropriate types
-      final jsonData = <String, dynamic>{};
-      data.forEach((key, value) {
-        if (key == 'metadata' && value != null) {
-          try {
-            jsonData[key] = jsonDecode(value);
-          } catch (e) {
-            debugPrint('Error decoding metadata: $e');
-            jsonData[key] = null;
+    return _withRetry(() async {
+      try {
+        debugPrint('Getting location: $id');
+        final data = await UpstashConfig.redis.hgetall('location:$id');
+        if (data == null || data.isEmpty) return null;
+        final jsonData = <String, dynamic>{};
+        data.forEach((key, value) {
+          if (key == 'metadata' && value != null) {
+            try {
+              jsonData[key] = jsonDecode(value);
+            } catch (e) {
+              debugPrint('Error decoding metadata: $e');
+              jsonData[key] = null;
+            }
+          } else {
+            jsonData[key] = value;
           }
-        } else {
-          jsonData[key] = value;
-        }
-      });
-      
-      return Location.fromJson(jsonData);
-    } catch (e, stack) {
-      debugPrint('Error getting location: $e\n$stack');
-      rethrow;
-    }
+        });
+        return Location.fromJson(jsonData);
+      } catch (e, stack) {
+        debugPrint('Error getting location: $e\n$stack');
+        rethrow;
+      }
+    });
   }
 
   Future<List<Location>> getLocationsByCouncil(String councilId) async {
-    try {
-      final locationIds = await _redis.smembers('council:$councilId:locations');
-      final locations = <Location>[];
+    return _withRetry(() async {
+      try {
+        // First try to get the locations as a set
+        try {
+          final locationIds = await UpstashConfig.redis.smembers('council:$councilId:locations');
+          final locations = <Location>[];
+          for (final id in locationIds) {
+            final location = await getLocation(id);
+            if (location != null) {
+              locations.add(location);
+            }
+          }
+          return locations;
+        } catch (e) {
+          // If we get a WRONGTYPE error, we need to fix the data structure
+          debugPrint('Error accessing council locations as set: $e');
+          if (e.toString().contains('WRONGTYPE')) {
+            await _fixCouncilLocationsStructure(councilId);
+            // Retry getting locations after fixing the structure
+            final locationIds = await UpstashConfig.redis.smembers('council:$councilId:locations');
+            final locations = <Location>[];
+            for (final id in locationIds) {
+              final location = await getLocation(id);
+              if (location != null) {
+                locations.add(location);
+              }
+            }
+            return locations;
+          }
+          rethrow;
+        }
+      } catch (e) {
+        debugPrint('Error getting locations by council: $e');
+        rethrow;
+      }
+    });
+  }
 
-      for (final id in locationIds) {
-        final location = await getLocation(id);
-        if (location != null) {
-          locations.add(location);
+  Future<void> _fixCouncilLocationsStructure(String councilId) async {
+    try {
+      // Get the old data
+      final oldData = await UpstashConfig.redis.get('council:$councilId:locations');
+      if (oldData != null) {
+        // Parse the old data
+        final List<dynamic> locations = jsonDecode(oldData);
+        // Convert to new format (set)
+        await UpstashConfig.redis.del(['council:$councilId:locations']);
+        if (locations.isNotEmpty) {
+          await UpstashConfig.redis.sadd('council:$councilId:locations', locations.map((l) => l.toString()).toList());
         }
       }
-
-      return locations;
     } catch (e) {
-      print('Error getting locations by council: $e');
+      debugPrint('Error fixing council locations structure: $e');
       rethrow;
     }
   }

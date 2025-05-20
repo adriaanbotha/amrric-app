@@ -6,21 +6,37 @@ import 'package:amrric_app/models/animal.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/utils/permission_helper.dart';
-import 'package:upstash_redis/upstash_redis.dart';
 
-class AnimalService {
-  final Redis _redis;
+final animalsProvider = StateNotifierProvider<AnimalService, AsyncValue<List<Animal>>>((ref) {
+  return AnimalService(ref.watch(authServiceProvider));
+});
+
+class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
   final AuthService _authService;
   final AnimalPermissions _permissions;
 
-  AnimalService(this._redis, this._authService) 
-      : _permissions = AnimalPermissions(_authService) {
-    debugPrint('AnimalService initialized');
+  AnimalService(this._authService) 
+      : _permissions = AnimalPermissions(_authService),
+        super(const AsyncValue.loading()) {
+    loadAnimals();
+  }
+
+  Future<void> loadAnimals() async {
+    try {
+      debugPrint('Loading animals...');
+      state = const AsyncValue.loading();
+      final animals = await getAnimals();
+      debugPrint('Loaded ${animals.length} animals');
+      state = AsyncValue.data(animals);
+    } catch (e, stack) {
+      debugPrint('Error loading animals: $e\n$stack');
+      state = AsyncValue.error(e, stack);
+    }
   }
 
   // Create animal with role-based validation
   Future<Animal> addAnimal(Animal animal) async {
-    if (!_permissions.canCreateAnimal()) {
+    if (!await _permissions.canCreateAnimal()) {
       throw Exception('Permission denied: Cannot create animal');
     }
 
@@ -39,21 +55,21 @@ class AnimalService {
         return MapEntry(key, value.toString());
       });
 
-      await _redis.hset(
+      await UpstashConfig.redis.hset(
         'animal:${animal.id}',
         processedData,
       );
 
       // Add the animal ID to the set of all animals
-      await _redis.sadd('animals', [animal.id]);
+      await UpstashConfig.redis.sadd('animals', [animal.id]);
 
       // Add to indexes
-      await _redis.sadd('animals:all', [animal.id]);
-      await _redis.sadd('animals:location:${animal.locationId}', [animal.id]);
-      await _redis.sadd('animals:house:${animal.houseId}', [animal.id]);
+      await UpstashConfig.redis.sadd('animals:all', [animal.id]);
+      await UpstashConfig.redis.sadd('animals:location:${animal.locationId}', [animal.id]);
+      await UpstashConfig.redis.sadd('animals:house:${animal.houseId}', [animal.id]);
 
       if (user.role == UserRole.veterinaryUser) {
-        await _redis.sadd('animals:medical', [animal.id]);
+        await UpstashConfig.redis.sadd('animals:medical', [animal.id]);
       }
 
       debugPrint('Animal created successfully: ${animal.id}');
@@ -65,59 +81,48 @@ class AnimalService {
     }
   }
 
-  // Get all animals based on user role
   Future<List<Animal>> getAnimals() async {
-    final user = await _authService.getCurrentUser();
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
+    try {
+      debugPrint('Getting all animals');
+      final keys = await UpstashConfig.redis.keys('animal:*');
+      debugPrint('Found ${keys.length} animal keys');
+      final animals = <Animal>[];
 
-    final animalIds = await _redis.smembers('animals');
-    final animals = <Animal>[];
-
-    for (final id in animalIds) {
-      final animalData = await _redis.hgetall('animal:$id');
-      if (animalData == null || animalData.isEmpty) continue;
-
-      try {
-        final animal = Animal.fromJson(animalData);
-
-        // Filter based on user role
-        switch (user.role) {
-          case UserRole.systemAdmin:
-            animals.add(animal);
-            break;
-          case UserRole.municipalityAdmin:
-            if (animal.councilId == 'council1') {  // Match the test data
-              animals.add(animal);
-            }
-            break;
-          case UserRole.veterinaryUser:
-            // Veterinary users need to see all animals to provide care
-            animals.add(animal);
-            break;
-          case UserRole.censusUser:
-            if (animal.locationId == 'location_6') {  // Match the test data
-              // Census users can see basic animal data
-              animals.add(animal.copyWith(
-                medicalHistory: null,
-                metadata: null,
-              ));
-            }
-            break;
+      for (final key in keys) {
+        try {
+          final data = await UpstashConfig.redis.hgetall(key);
+          debugPrint('Animal data for $key: $data');
+          if (data != null && data.isNotEmpty) {
+            final jsonData = <String, dynamic>{};
+            data.forEach((key, value) {
+              if (key == 'metadata' && value != null) {
+                try {
+                  jsonData[key] = jsonDecode(value);
+                } catch (e) {
+                  debugPrint('Error decoding metadata: $e');
+                  jsonData[key] = null;
+                }
+              } else {
+                jsonData[key] = value;
+              }
+            });
+            animals.add(Animal.fromJson(jsonData));
+          }
+        } catch (e) {
+          debugPrint('Error processing animal $key: $e');
+          continue;
         }
-      } catch (e) {
-        debugPrint('Error parsing animal data: $e');
-        continue;
       }
+      return animals;
+    } catch (e, stack) {
+      debugPrint('Error getting animals: $e\n$stack');
+      rethrow;
     }
-
-    return animals;
   }
 
   // Update animal with role-based validation
   Future<Animal> updateAnimal(Animal animal) async {
-    if (!_permissions.canEditAnimal()) {
+    if (!await _permissions.canEditAnimal()) {
       throw Exception('Permission denied: Cannot update animal');
     }
 
@@ -134,7 +139,7 @@ class AnimalService {
       });
 
       // Update the animal data
-      await _redis.hset(
+      await UpstashConfig.redis.hset(
         'animal:$id',
         processedData,
       );
@@ -150,13 +155,17 @@ class AnimalService {
 
   // Delete animal with role-based validation
   Future<void> deleteAnimal(String id) async {
-    if (!_permissions.canDeleteAnimal()) {
+    if (!await _permissions.canDeleteAnimal()) {
       throw Exception('Permission denied: Cannot delete animal');
     }
 
     try {
+      final animals = await getAnimals();
+      animals.removeWhere((a) => a.id == id);
+      await UpstashConfig.redis.set('animals', json.encode(animals.map((a) => a.toJson()).toList()));
+
       // Get animal data first to remove from indexes
-      final animalData = await _redis.hgetall('animal:$id');
+      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
       if (animalData != null && animalData.isNotEmpty) {
         final processedData = animalData.map((key, value) {
           if (value is String && (key == 'medicalHistory' || key == 'censusData' || key == 'metadata')) {
@@ -173,13 +182,13 @@ class AnimalService {
         final animal = Animal.fromJson(processedData);
 
         // Remove from indexes
-        await _redis.srem('animals:all', [id]);
-        await _redis.srem('animals:location:${animal.locationId}', [id]);
-        await _redis.srem('animals:house:${animal.houseId}', [id]);
-        await _redis.srem('animals:medical', [id]);
+        await UpstashConfig.redis.srem('animals:all', [id]);
+        await UpstashConfig.redis.srem('animals:location:${animal.locationId}', [id]);
+        await UpstashConfig.redis.srem('animals:house:${animal.houseId}', [id]);
+        await UpstashConfig.redis.srem('animals:medical', [id]);
 
         // Delete the animal data
-        await _redis.del(['animal:$id']);
+        await UpstashConfig.redis.del(['animal:$id']);
       }
 
       debugPrint('Animal deleted successfully: $id');
@@ -192,7 +201,7 @@ class AnimalService {
 
   // Add medical record with role validation
   Future<void> addMedicalRecord(String animalId, Map<String, dynamic> medicalData) async {
-    if (!_permissions.canAddMedicalRecords()) {
+    if (!await _permissions.canAddMedicalRecords()) {
       throw Exception('Permission denied: Cannot add medical records');
     }
 
@@ -211,7 +220,7 @@ class AnimalService {
       );
 
       await updateAnimal(updatedAnimal);
-      await _redis.sadd('animals:medical', [animalId]);
+      await UpstashConfig.redis.sadd('animals:medical', [animalId]);
 
       debugPrint('Medical record added successfully for animal: $animalId');
     } catch (e, stackTrace) {
@@ -221,40 +230,27 @@ class AnimalService {
     }
   }
 
-  // Get single animal with role-based data filtering
   Future<Animal?> getAnimal(String id) async {
     try {
-      final animalData = await _redis.hgetall('animal:$id');
-      if (animalData == null || animalData.isEmpty) return null;
-
-      // Process the data before creating the Animal object
-      final processedData = animalData.map((key, value) {
-        if (value is String && (key == 'medicalHistory' || key == 'censusData' || key == 'metadata')) {
+      debugPrint('Getting animal: $id');
+      final data = await UpstashConfig.redis.hgetall('animal:$id');
+      if (data == null || data.isEmpty) return null;
+      final jsonData = <String, dynamic>{};
+      data.forEach((key, value) {
+        if (key == 'metadata' && value != null) {
           try {
-            return MapEntry(key, jsonDecode(value));
+            jsonData[key] = jsonDecode(value);
           } catch (e) {
-            debugPrint('Error parsing $key: $e');
-            return MapEntry(key, {});
+            debugPrint('Error decoding metadata: $e');
+            jsonData[key] = null;
           }
+        } else {
+          jsonData[key] = value;
         }
-        return MapEntry(key, value);
       });
-
-      final animal = Animal.fromJson(processedData);
-
-      // Filter data based on role
-      if (_authService.currentUser?.role == UserRole.censusUser) {
-        // Return only basic information for census users
-        return animal.copyWith(
-          medicalHistory: null,
-          metadata: null,
-        );
-      }
-
-      return animal;
-    } catch (e, stackTrace) {
-      debugPrint('Error getting animal: $e');
-      debugPrint('Stack trace: $stackTrace');
+      return Animal.fromJson(jsonData);
+    } catch (e, stack) {
+      debugPrint('Error getting animal: $e\n$stack');
       rethrow;
     }
   }
@@ -262,14 +258,14 @@ class AnimalService {
   // Get statistics for the system or a specific council
   Future<Map<String, dynamic>> getStatistics(String? councilId) async {
     try {
-      final animalIds = await _redis.smembers('animals');
+      final animalIds = await UpstashConfig.redis.smembers('animals');
       int totalAnimals = 0;
       int activeAnimals = 0;
       int animalsWithMedicalRecords = 0;
       int totalCouncils = 0;
 
       for (final id in animalIds) {
-        final animalData = await _redis.hgetall('animal:$id');
+        final animalData = await UpstashConfig.redis.hgetall('animal:$id');
         if (animalData == null || animalData.isEmpty) continue;
 
         try {
@@ -293,7 +289,7 @@ class AnimalService {
 
       // Get total councils if not filtering by council
       if (councilId == null) {
-        final councils = await _redis.smembers('councils');
+        final councils = await UpstashConfig.redis.smembers('councils');
         totalCouncils = councils.length;
       }
 
@@ -312,7 +308,7 @@ class AnimalService {
   // Get all councils
   Future<List<String>> getCouncils() async {
     try {
-      final councils = await _redis.smembers('councils');
+      final councils = await UpstashConfig.redis.smembers('councils');
       return councils.map((e) => e.toString()).toList();
     } catch (e) {
       debugPrint('Error getting councils: $e');
@@ -327,11 +323,11 @@ class AnimalService {
       throw Exception('User not authenticated');
     }
 
-    final animalIds = await _redis.smembers('animals');
+    final animalIds = await UpstashConfig.redis.smembers('animals');
     final animals = <Animal>[];
 
     for (final id in animalIds) {
-      final animalData = await _redis.hgetall('animal:$id');
+      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
       if (animalData == null || animalData.isEmpty) continue;
 
       try {
@@ -381,11 +377,11 @@ class AnimalService {
       throw Exception('User not authenticated');
     }
 
-    final animalIds = await _redis.smembers('animals');
+    final animalIds = await UpstashConfig.redis.smembers('animals');
     final animals = <Animal>[];
 
     for (final id in animalIds) {
-      final animalData = await _redis.hgetall('animal:$id');
+      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
       if (animalData == null || animalData.isEmpty) continue;
 
       try {
@@ -410,11 +406,11 @@ class AnimalService {
       throw Exception('User not authenticated');
     }
 
-    final animalIds = await _redis.smembers('animals');
+    final animalIds = await UpstashConfig.redis.smembers('animals');
     final animals = <Animal>[];
 
     for (final id in animalIds) {
-      final animalData = await _redis.hgetall('animal:$id');
+      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
       if (animalData == null || animalData.isEmpty) continue;
 
       try {
@@ -443,9 +439,21 @@ class AnimalService {
 
     return animals;
   }
-}
 
-final animalServiceProvider = Provider<AnimalService>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return AnimalService(UpstashConfig.redis, authService);
-}); 
+  Future<List<Animal>> getAnimalsByLocation(String locationId) async {
+    try {
+      final animalIds = await UpstashConfig.redis.smembers('location:$locationId:animals');
+      final animals = <Animal>[];
+      for (final id in animalIds) {
+        final animal = await getAnimal(id);
+        if (animal != null) {
+          animals.add(animal);
+        }
+      }
+      return animals;
+    } catch (e) {
+      print('Error getting animals by location: $e');
+      rethrow;
+    }
+  }
+} 

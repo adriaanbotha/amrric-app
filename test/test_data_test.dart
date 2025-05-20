@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:amrric_app/config/test_data.dart';
-import 'package:amrric_app/config/upstash_config.dart';
+import 'package:amrric_app/config/redis_config.dart';
+import 'package:redis/redis.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/models/user.dart';
-import 'package:upstash_redis/upstash_redis.dart';
 import 'test_helper.dart';
 
 void main() {

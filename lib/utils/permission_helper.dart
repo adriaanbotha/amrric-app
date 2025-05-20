@@ -7,87 +7,100 @@ class AnimalPermissions {
   AnimalPermissions(this._authService);
 
   // Full animal management
-  bool canManageAnimals() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canManageAnimals() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
            role == UserRole.veterinaryUser || role == UserRole.censusUser;
   }
   
   // View permissions
-  bool canViewAllAnimals() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canViewAllAnimals() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
            role == UserRole.veterinaryUser;
   }
 
-  bool canViewCouncilAnimals() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canViewCouncilAnimals() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.municipalityAdmin || role == UserRole.censusUser;
   }
 
-  bool canViewMedicalHistory() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canViewMedicalHistory() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.veterinaryUser || role == UserRole.systemAdmin || 
            role == UserRole.municipalityAdmin;
   }
   
   // Edit permissions
-  bool canCreateAnimal() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canCreateAnimal() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
            role == UserRole.censusUser || role == UserRole.veterinaryUser;
   }
 
-  bool canEditAnimal() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canEditAnimal() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
            role == UserRole.veterinaryUser || role == UserRole.censusUser;
   }
 
-  bool canDeleteAnimal() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canDeleteAnimal() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.systemAdmin || role == UserRole.veterinaryUser || 
            role == UserRole.municipalityAdmin;
   }
   
   // Medical permissions
-  bool canAddMedicalRecords() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canAddMedicalRecords() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.veterinaryUser || role == UserRole.systemAdmin;
   }
 
-  bool canEditMedicalRecords() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canEditMedicalRecords() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.veterinaryUser || role == UserRole.systemAdmin;
   }
 
-  bool canAddTreatments() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canAddTreatments() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.veterinaryUser || role == UserRole.systemAdmin;
   }
   
   // Census permissions
-  bool canAddBasicAnimal() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canAddBasicAnimal() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.censusUser || role == UserRole.systemAdmin || 
            role == UserRole.veterinaryUser || role == UserRole.municipalityAdmin;
   }
 
-  bool canUpdateBasicInfo() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canUpdateBasicInfo() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.censusUser || role == UserRole.systemAdmin || 
            role == UserRole.veterinaryUser || role == UserRole.municipalityAdmin;
   }
   
   // Validation permissions
-  bool canValidateAnimalData() {
-    final role = _authService.currentUser?.role;
+  Future<bool> canValidateAnimalData() async {
+    final user = await _authService.getCurrentUser();
+    final role = user?.role;
     return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
            role == UserRole.veterinaryUser;
   }
 
-  bool canAddAnimal() {
-    final user = _authService.currentUser;
+  Future<bool> canAddAnimal() async {
+    final user = await _authService.getCurrentUser();
     if (user == null) return false;
 
     switch (user.role) {

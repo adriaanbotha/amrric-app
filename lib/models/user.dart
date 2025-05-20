@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:upstash_redis/upstash_redis.dart';
 import 'package:flutter/foundation.dart';
+import 'package:amrric_app/config/upstash_config.dart';
 
 enum UserRole {
   systemAdmin,
@@ -43,6 +43,10 @@ class User {
        updatedAt = updatedAt ?? DateTime.now();
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // Guard: required fields must be present
+    if (json['id'] == null || json['email'] == null || json['role'] == null) {
+      throw Exception('Missing required user fields: id, email, or role');
+    }
     try {
       List<Map<String, dynamic>> activityLog = [];
       

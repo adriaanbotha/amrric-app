@@ -1,113 +1,79 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:upstash_redis/upstash_redis.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class UpstashConfig {
-  static Redis? _redis;
+  static late final Redis redis;
 
-  static Redis get redis {
-    if (_redis == null) {
-      throw Exception('Redis not initialized. Call initialize() first.');
+  static Future<void> initialize() async {
+    await dotenv.load();
+    final endpoint = dotenv.env['UPSTASH_REDIS_URL'] ?? '';
+    final token = dotenv.env['UPSTASH_REDIS_TOKEN'] ?? '';
+    if (endpoint.isEmpty || token.isEmpty) {
+      throw Exception('UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN must be set in .env file');
     }
-    return _redis!;
-  }
-
-  static Future<Redis> initialize() async {
-    if (_redis != null) {
-      debugPrint('Redis already initialized');
-      return _redis!;
-    }
-
-    final url = dotenv.env['UPSTASH_REDIS_REST_URL'];
-    final token = dotenv.env['UPSTASH_REDIS_REST_TOKEN'];
-
-    debugPrint('Initializing Redis with URL: $url');
-
-    if (url == null || token == null) {
-      throw Exception('Missing Upstash Redis configuration. Please check your .env file.');
-    }
-
-    try {
-      _redis = Redis(
-        url: url,
-        token: token,
-      );
-
-      // Test the connection
-      final result = await _redis!.ping();
-      debugPrint('Redis ping result: $result');
-      debugPrint('Successfully connected to Upstash Redis');
-      return _redis!;
-    } catch (e, stackTrace) {
-      debugPrint('Error connecting to Redis: $e');
-      debugPrint('Stack trace: $stackTrace');
-      _redis = null;
-      rethrow;
-    }
+    redis = Redis(
+      url: endpoint,
+      token: token,
+    );
   }
 
   static Future<void> reset() async {
-    if (_redis == null) {
-      throw Exception('Redis not initialized. Call initialize() first.');
-    }
-
     try {
+      debugPrint('Starting Upstash data reset...');
+      
       // Get all keys
-      final keys = await _redis!.keys('*');
+      final keys = await redis.keys('*');
       debugPrint('Found ${keys.length} keys to delete');
-
-      // Delete all keys in batches
+      
+      // Delete all keys if any exist
       if (keys.isNotEmpty) {
-        for (var i = 0; i < keys.length; i += 100) {
-          final batch = keys.skip(i).take(100).toList();
-          await _redis!.del(batch);
-          debugPrint('Deleted keys ${i + 1} to ${i + batch.length}');
-        }
+        await redis.del(keys);
+        debugPrint('Successfully deleted all keys');
+      } else {
+        debugPrint('No keys found to delete');
       }
 
-      debugPrint('Successfully cleared all Redis keys');
-    } catch (e, stackTrace) {
-      debugPrint('Error resetting Redis: $e');
-      debugPrint('Stack trace: $stackTrace');
+      // Verify deletion
+      final remainingKeys = await redis.keys('*');
+      if (remainingKeys.isNotEmpty) {
+        throw Exception('Failed to delete all keys. ${remainingKeys.length} keys remain.');
+      }
+      
+      debugPrint('Upstash data reset completed successfully');
+    } catch (e) {
+      debugPrint('Error during Upstash reset: $e');
+      throw Exception('Failed to reset Upstash data: $e');
+    }
+  }
+
+  static Future<bool> verifyConnection() async {
+    try {
+      await redis.ping();
+      return true;
+    } catch (e) {
+      debugPrint('Error verifying Upstash connection: $e');
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getDataStats() async {
+    try {
+      final keys = await redis.keys('*');
+      final stats = <String, int>{};
+      
+      for (final key in keys) {
+        final type = await redis.type(key);
+        stats[type.toString()] = (stats[type.toString()] ?? 0) + 1;
+      }
+      
+      return {
+        'total_keys': keys.length,
+        'key_types': stats,
+      };
+    } catch (e) {
+      debugPrint('Error getting Upstash stats: $e');
       rethrow;
-    }
-  }
-
-  // Helper methods for common Redis operations
-  static Future<String?> get(String key) async {
-    try {
-      return await redis.get(key);
-    } catch (e) {
-      debugPrint('Error getting key $key: $e');
-      return null;
-    }
-  }
-
-  static Future<void> set(String key, String value) async {
-    try {
-      await redis.set(key, value);
-    } catch (e) {
-      debugPrint('Error setting key $key: $e');
-      rethrow;
-    }
-  }
-
-  static Future<void> delete(String key) async {
-    try {
-      await redis.del([key]);
-    } catch (e) {
-      debugPrint('Error deleting key $key: $e');
-      rethrow;
-    }
-  }
-
-  static Future<List<String>> keys(String pattern) async {
-    try {
-      final result = await redis.keys(pattern);
-      return result.map((e) => e.toString()).toList();
-    } catch (e) {
-      debugPrint('Error getting keys with pattern $pattern: $e');
-      return [];
     }
   }
 } 

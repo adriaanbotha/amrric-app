@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 class ErrorDisplay extends StatelessWidget {
   final Object error;
+  final VoidCallback? onRetry;
 
   const ErrorDisplay({
     super.key,
     required this.error,
+    this.onRetry,
   });
 
   @override
@@ -25,6 +27,13 @@ class ErrorDisplay extends StatelessWidget {
             style: const TextStyle(color: Colors.red),
             textAlign: TextAlign.center,
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
         ],
       ),
     );

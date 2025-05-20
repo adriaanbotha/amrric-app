@@ -5,6 +5,10 @@ import 'package:amrric_app/config/theme.dart';
 import 'package:amrric_app/config/routes.dart';
 import 'package:amrric_app/screens/login_screen.dart';
 import 'package:amrric_app/screens/home_screen.dart';
+import 'package:amrric_app/screens/admin/animal_management_screen.dart';
+import 'package:amrric_app/screens/medication_screen.dart';
+import 'package:amrric_app/screens/reports_screen.dart';
+import 'package:amrric_app/screens/settings_screen.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/services/council_service.dart';
 import 'package:amrric_app/services/location_service.dart';
@@ -12,24 +16,20 @@ import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/config/test_data.dart' as test_data;
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() async {
-  try {
-    debugPrint('Environment loaded successfully');
-    await dotenv.load(fileName: ".env");
-    debugPrint('Starting app initialization...');
-    await UpstashConfig.initialize();
-    debugPrint('Redis initialized successfully');
-    debugPrint('Starting test data creation...');
-    await test_data.createTestData();
-    debugPrint('Test data created successfully');
-    
-    debugPrint('App initialization completed successfully');
-    runApp(const ProviderScope(child: AmrricApp()));
-  } catch (e) {
-    debugPrint('Error during initialization: $e');
-    rethrow;
-  }
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive
+  final appDocumentDir = await getApplicationDocumentsDirectory();
+  await Hive.initFlutter(appDocumentDir.path);
+  
+  // Initialize Upstash
+  await UpstashConfig.initialize();
+  
+  runApp(const ProviderScope(child: AmrricApp()));
 }
 
 class AmrricApp extends ConsumerStatefulWidget {
@@ -52,11 +52,6 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
   Future<void> _initializeApp() async {
     try {
       debugPrint('Starting app initialization...');
-      
-      // Initialize Redis
-      await UpstashConfig.initialize();
-      debugPrint('Redis initialized successfully');
-      
       setState(() {
         _isInitialized = true;
         _error = null;
@@ -74,8 +69,10 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('Building AmrricApp: _isInitialized=$_isInitialized, _error=$_error');
     // If there's an error, show the error screen
     if (_error != null) {
+      debugPrint('Error screen branch');
       return MaterialApp(
         title: 'AMRRIC - Error',
         theme: AmrricTheme.theme,
@@ -111,6 +108,7 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
 
     // If not initialized, show loading screen
     if (!_isInitialized) {
+      debugPrint('Loading screen branch');
       return MaterialApp(
         title: 'AMRRIC',
         theme: AmrricTheme.theme,
@@ -131,11 +129,23 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
 
     // App is initialized, show main app
     final authState = ref.watch(authStateProvider);
+    debugPrint('main.dart: authState is $authState');
+    if (authState == null) {
+      debugPrint('Login screen branch');
+    } else {
+      debugPrint('Home screen branch');
+    }
     return MaterialApp(
       title: 'AMRRIC',
       theme: AmrricTheme.theme,
-      routes: routes,
-      home: authState == null ? const LoginScreen() : const HomeScreen(),
+      routes: {
+        '/login': (context) => LoginScreen(),
+        '/animals': (context) => AnimalManagementScreen(),
+        '/medications': (context) => MedicationScreen(),
+        '/reports': (context) => ReportsScreen(),
+        '/settings': (context) => SettingsScreen(),
+      },
+      home: authState == null ? LoginScreen() : HomeScreen(),
     );
   }
 }
