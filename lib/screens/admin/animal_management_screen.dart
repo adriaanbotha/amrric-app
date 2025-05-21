@@ -10,6 +10,7 @@ import 'package:amrric_app/widgets/animal_photo_gallery.dart';
 import 'package:amrric_app/services/photo_sync_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:amrric_app/config/upstash_config.dart';
+import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class AnimalManagementScreen extends ConsumerStatefulWidget {
   const AnimalManagementScreen({super.key});
@@ -24,221 +25,185 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
 
   @override
   Widget build(BuildContext context) {
+    return AppScaffold(
+      appBar: AppBar(
+        title: const Text('Animal Management'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => _showAddAnimalDialog()
+          ),
+        ],
+      ),
+      body: _buildContent(),
+    );
+  }
+
+  Widget _buildContent() {
     final authService = ref.watch(authServiceProvider);
     return FutureBuilder<User?>(
       future: authService.getCurrentUser(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
         final user = snapshot.data;
         final permissions = AnimalPermissions(authService);
         if (user == null) {
-          return const Scaffold(
-            body: Center(
-              child: Text('Please log in to access animal management'),
-            ),
+          return const Center(
+            child: Text('Please log in to access animal management'),
           );
         }
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Animal Management'),
-            actions: [
-              FutureBuilder<bool>(
-                future: permissions.canAddAnimal(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SizedBox.shrink();
-                  }
-                  if (snapshot.data == true) {
-                    return IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AnimalFormScreen(),
-                        ),
-                      ).then((_) => setState(() {})),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ],
-          ),
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Search Bar
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: 'Search animals...',
-                          prefixIcon: Icon(Icons.search),
-                          border: InputBorder.none,
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            searchQuery = value;
-                          });
-                        },
+        return SafeArea(
+          child: Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Search animals...',
+                        prefixIcon: Icon(Icons.search),
+                        border: InputBorder.none,
                       ),
-                    ),
-                  ),
-                ),
-
-                // Main Content
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      setState(() {});
-                    },
-                    child: FutureBuilder<List<Animal>>(
-                      future: _getAnimalsList(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  size: 48,
-                                  color: Colors.red,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Error: ${snapshot.error}',
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () => setState(() {}),
-                                  child: const Text('Retry'),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        final animals = snapshot.data ?? [];
-
-                        if (animals.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.pets,
-                                  size: 48,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'No animals found',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                FutureBuilder<bool>(
-                                  future: permissions.canAddAnimal(),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    if (snapshot.data == true) {
-                                      return ElevatedButton.icon(
-                                        onPressed: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => const AnimalFormScreen(),
-                                          ),
-                                        ).then((_) => setState(() {})),
-                                        icon: const Icon(Icons.add),
-                                        label: const Text('Add Animal'),
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        return ListView.builder(
-                          itemCount: animals.length,
-                          itemBuilder: (context, index) {
-                            final animal = animals[index];
-                            return FutureBuilder<Map<String, bool>>(
-                              future: Future.wait([
-                                permissions.canEditAnimal(),
-                                permissions.canDeleteAnimal(),
-                                permissions.canViewMedicalHistory(),
-                              ]).then((results) => {
-                                'canEdit': results[0],
-                                'canDelete': results[1],
-                                'canViewMedical': results[2],
-                              }),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                  return const Center(child: CircularProgressIndicator());
-                                }
-                                final perms = snapshot.data ?? {
-                                  'canEdit': false,
-                                  'canDelete': false,
-                                  'canViewMedical': false,
-                                };
-                                return _buildAnimalCard(
-                                  animal: animal,
-                                  canEdit: perms['canEdit']!,
-                                  canDelete: perms['canDelete']!,
-                                  canViewMedical: perms['canViewMedical']!,
-                                );
-                              },
-                            );
-                          },
-                        );
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value;
+                        });
                       },
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          floatingActionButton: FutureBuilder<bool>(
-            future: permissions.canAddAnimal(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SizedBox.shrink();
-              }
-              if (snapshot.data == true) {
-                return FloatingActionButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AnimalFormScreen(),
-                    ),
-                  ).then((_) => setState(() {})),
-                  child: const Icon(Icons.add),
-                );
-              }
-              return const SizedBox.shrink();
-            },
+              ),
+
+              // Main Content
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {});
+                  },
+                  child: FutureBuilder<List<Animal>>(
+                    future: _getAnimalsList(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 48,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error: ${snapshot.error}',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () => setState(() {}),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      final animals = snapshot.data ?? [];
+
+                      if (animals.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.pets,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'No animals found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              FutureBuilder<bool>(
+                                future: permissions.canAddAnimal(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  if (snapshot.data == true) {
+                                    return ElevatedButton.icon(
+                                      onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const AnimalFormScreen(),
+                                        ),
+                                      ).then((_) => setState(() {})),
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Add Animal'),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: animals.length,
+                        itemBuilder: (context, index) {
+                          final animal = animals[index];
+                          return FutureBuilder<Map<String, bool>>(
+                            future: Future.wait([
+                              permissions.canEditAnimal(),
+                              permissions.canDeleteAnimal(),
+                              permissions.canViewMedicalHistory(),
+                            ]).then((results) => {
+                              'canEdit': results[0],
+                              'canDelete': results[1],
+                              'canViewMedical': results[2],
+                            }),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              final perms = snapshot.data ?? {
+                                'canEdit': false,
+                                'canDelete': false,
+                                'canViewMedical': false,
+                              };
+                              return _buildAnimalCard(
+                                animal: animal,
+                                canEdit: perms['canEdit']!,
+                                canDelete: perms['canDelete']!,
+                                canViewMedical: perms['canViewMedical']!,
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -567,5 +532,9 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
         }
       }
     }
+  }
+
+  void _showAddAnimalDialog() {
+    // Implementation of _showAddAnimalDialog method
   }
 } 

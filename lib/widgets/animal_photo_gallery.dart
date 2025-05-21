@@ -61,20 +61,19 @@ class _AnimalPhotoGalleryState extends ConsumerState<AnimalPhotoGallery> {
         setState(() => _isLoading = false);
         return;
       }
-      // For each photo in existingPhotos, check if file exists, else fetch from Upstash if online
-      for (final photoPath in widget.existingPhotos) {
-        final file = File(photoPath);
+      final directory = await getApplicationDocumentsDirectory();
+      // For each photo in existingPhotos (file names), reconstruct local path and check existence
+      for (final fileName in widget.existingPhotos) {
+        final localPath = '${directory.path}/$fileName';
+        final file = File(localPath);
         if (await file.exists()) {
-          _photos.add(photoPath);
+          _photos.add(localPath);
         } else {
           // Try to fetch from Upstash only if online
           try {
-            final photoId = photoPath.split('/').last;
-            final directory = await getApplicationDocumentsDirectory();
-            final localPath = '${directory.path}/$photoId';
             final photoData = await widget.photoSyncService.getPhoto(
               userId: userId,
-              photoId: photoId,
+              photoId: fileName,
               filePath: localPath,
             );
             if (photoData != null && await File(localPath).exists()) {

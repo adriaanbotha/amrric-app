@@ -6,6 +6,7 @@ import 'package:amrric_app/widgets/error_display.dart';
 import 'package:amrric_app/config/theme.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/services/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MedicationScreen extends StatefulWidget {
   const MedicationScreen({super.key});
@@ -15,7 +16,7 @@ class MedicationScreen extends StatefulWidget {
 }
 
 class _MedicationScreenState extends State<MedicationScreen> {
-  final AnimalService _animalService = AnimalService(AuthService());
+  final AnimalService _animalService = AnimalService(AuthService(), ProviderContainer());
   List<Animal> _animals = [];
   bool _isLoading = true;
   String? _error;

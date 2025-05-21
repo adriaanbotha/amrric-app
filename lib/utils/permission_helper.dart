@@ -28,34 +28,14 @@ class AnimalPermissions {
     return role == UserRole.municipalityAdmin || role == UserRole.censusUser;
   }
 
-  Future<bool> canViewMedicalHistory() async {
-    final user = await _authService.getCurrentUser();
-    final role = user?.role;
-    return role == UserRole.veterinaryUser || role == UserRole.systemAdmin || 
-           role == UserRole.municipalityAdmin;
-  }
+  Future<bool> canViewMedicalHistory() async => true;
   
   // Edit permissions
-  Future<bool> canCreateAnimal() async {
-    final user = await _authService.getCurrentUser();
-    final role = user?.role;
-    return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
-           role == UserRole.censusUser || role == UserRole.veterinaryUser;
-  }
+  Future<bool> canCreateAnimal() async => true;
 
-  Future<bool> canEditAnimal() async {
-    final user = await _authService.getCurrentUser();
-    final role = user?.role;
-    return role == UserRole.systemAdmin || role == UserRole.municipalityAdmin || 
-           role == UserRole.veterinaryUser || role == UserRole.censusUser;
-  }
+  Future<bool> canEditAnimal() async => true;
 
-  Future<bool> canDeleteAnimal() async {
-    final user = await _authService.getCurrentUser();
-    final role = user?.role;
-    return role == UserRole.systemAdmin || role == UserRole.veterinaryUser || 
-           role == UserRole.municipalityAdmin;
-  }
+  Future<bool> canDeleteAnimal() async => true;
   
   // Medical permissions
   Future<bool> canAddMedicalRecords() async {

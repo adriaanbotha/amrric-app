@@ -254,4 +254,29 @@ class PhotoSyncService {
   Future<void> clearLocalPhotos() async {
     await _localBox.clear();
   }
+
+  Future<void> deletePhotosForAnimal(String animalId) async {
+    try {
+      // Delete from local storage
+      final toDelete = <String>[];
+      for (final entry in _localBox.toMap().entries) {
+        final data = entry.value;
+        if (data['animalId'] == animalId) {
+          toDelete.add(entry.key);
+        }
+      }
+      for (final photoId in toDelete) {
+        final data = _localBox.get(photoId);
+        if (data != null && data['userId'] != null) {
+          await deletePhoto(data['userId'], photoId);
+        } else {
+          await _localBox.delete(photoId);
+        }
+      }
+      _logger.i('Deleted all photos for animal $animalId');
+    } catch (e) {
+      _logger.e('Error deleting photos for animal $animalId: $e');
+      rethrow;
+    }
+  }
 } 

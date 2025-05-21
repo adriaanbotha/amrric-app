@@ -12,6 +12,7 @@ import 'package:amrric_app/services/council_service.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class AnimalFormScreen extends ConsumerStatefulWidget {
   final Animal? animal;
@@ -80,7 +81,9 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
     final currentUser = await authService.getCurrentUser();
 
     try {
-      print('Saving animal with photoUrls: [32m$_photoUrls[0m');
+      // Only store file names in photoUrls
+      final photoFileNames = _photoUrls.map((p) => p.split('/').last).toList();
+      print('Saving animal with photoUrls: [32m$photoFileNames[0m');
       final animal = Animal(
         id: widget.animal?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text,
@@ -98,7 +101,7 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
         locationId: widget.animal?.locationId ?? currentUser?.locationId ?? 'default',
         councilId: widget.animal?.councilId ?? currentUser?.councilId ?? 'council1', // Match test data
         ownerId: widget.animal?.ownerId,
-        photoUrls: _photoUrls,
+        photoUrls: photoFileNames,
         medicalHistory: widget.animal?.medicalHistory,
         censusData: widget.animal?.censusData,
         metadata: widget.animal?.metadata,
@@ -115,10 +118,10 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
         await _photoSyncService!.syncPhotos();
       }
 
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -127,6 +130,15 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return AppScaffold(
+      appBar: AppBar(
+        title: Text(widget.animal == null ? 'Add Animal' : 'Edit Animal'),
+      ),
+      body: _buildForm(),
+    );
+  }
+
+  Widget _buildForm() {
     final authService = ref.watch(authServiceProvider);
     final permissions = AnimalPermissions(authService);
 
@@ -137,178 +149,173 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
         final isVetUser = currentUser?.role == UserRole.veterinaryUser;
         final isCensusUser = currentUser?.role == UserRole.censusUser;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(widget.animal == null ? 'Add Animal' : 'Edit Animal'),
-          ),
-          body: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Basic Information Section
+        return Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Basic Information Section
+                const Text(
+                  'Basic Information',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Name (Optional)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _speciesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Species *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the species';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                if (!isCensusUser) ...[
+                  TextFormField(
+                    controller: _breedController,
+                    decoration: const InputDecoration(
+                      labelText: 'Breed',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                TextFormField(
+                  controller: _colorController,
+                  decoration: const InputDecoration(
+                    labelText: 'Color/Markings',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                DropdownButtonFormField<String>(
+                  value: _sex,
+                  decoration: const InputDecoration(
+                    labelText: 'Sex *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: ['Male', 'Female'].map((sex) {
+                    return DropdownMenuItem(
+                      value: sex,
+                      child: Text(sex),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _sex = value!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Advanced Information Section (Not for Census Users)
+                if (!isCensusUser) ...[
                   const Text(
-                    'Basic Information',
+                    'Advanced Information',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
-                    controller: _nameController,
+                    controller: _microchipController,
                     decoration: const InputDecoration(
-                      labelText: 'Name (Optional)',
+                      labelText: 'Microchip Number',
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
 
                   TextFormField(
-                    controller: _speciesController,
+                    controller: _weightController,
                     decoration: const InputDecoration(
-                      labelText: 'Species *',
+                      labelText: 'Weight (kg)',
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter the species';
-                      }
-                      return null;
-                    },
+                    keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
 
-                  if (!isCensusUser) ...[
-                    TextFormField(
-                      controller: _breedController,
-                      decoration: const InputDecoration(
-                        labelText: 'Breed',
-                        border: OutlineInputBorder(),
+                  // Age Selector
+                  Row(
+                    children: [
+                      const Text('Estimated Age: '),
+                      Expanded(
+                        child: Slider(
+                          value: _estimatedAge.toDouble(),
+                          min: 0,
+                          max: 20,
+                          divisions: 20,
+                          label: _estimatedAge.toString(),
+                          onChanged: (value) {
+                            setState(() {
+                              _estimatedAge = value.round();
+                            });
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                      Text('$_estimatedAge years'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
-                  TextFormField(
-                    controller: _colorController,
-                    decoration: const InputDecoration(
-                      labelText: 'Color/Markings',
-                      border: OutlineInputBorder(),
-                    ),
+                // Status Section (Not for Census Users)
+                if (!isCensusUser) ...[
+                  const Text(
+                    'Status',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
 
-                  DropdownButtonFormField<String>(
-                    value: _sex,
-                    decoration: const InputDecoration(
-                      labelText: 'Sex *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: ['Male', 'Female'].map((sex) {
-                      return DropdownMenuItem(
-                        value: sex,
-                        child: Text(sex),
-                      );
-                    }).toList(),
+                  SwitchListTile(
+                    title: const Text('Active'),
+                    value: _isActive,
                     onChanged: (value) {
                       setState(() {
-                        _sex = value!;
+                        _isActive = value;
                       });
                     },
                   ),
-                  const SizedBox(height: 16),
-
-                  // Advanced Information Section (Not for Census Users)
-                  if (!isCensusUser) ...[
-                    const Text(
-                      'Advanced Information',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _microchipController,
-                      decoration: const InputDecoration(
-                        labelText: 'Microchip Number',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _weightController,
-                      decoration: const InputDecoration(
-                        labelText: 'Weight (kg)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Age Selector
-                    Row(
-                      children: [
-                        const Text('Estimated Age: '),
-                        Expanded(
-                          child: Slider(
-                            value: _estimatedAge.toDouble(),
-                            min: 0,
-                            max: 20,
-                            divisions: 20,
-                            label: _estimatedAge.toString(),
-                            onChanged: (value) {
-                              setState(() {
-                                _estimatedAge = value.round();
-                              });
-                            },
-                          ),
-                        ),
-                        Text('$_estimatedAge years'),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Status Section (Not for Census Users)
-                  if (!isCensusUser) ...[
-                    const Text(
-                      'Status',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-
-                    SwitchListTile(
-                      title: const Text('Active'),
-                      value: _isActive,
-                      onChanged: (value) {
-                        setState(() {
-                          _isActive = value;
-                        });
-                      },
-                    ),
-                  ],
-
-                  if (_photoSyncServiceReady && widget.animal != null)
-                    AnimalPhotoGallery(
-                      animalId: widget.animal!.id,
-                      existingPhotos: _photoUrls,
-                      photoSyncService: _photoSyncService!,
-                      onPhotoListChanged: (updatedList) {
-                        setState(() {
-                          _photoUrls = List<String>.from(updatedList);
-                        });
-                      },
-                    ),
-
-                  const SizedBox(height: 32),
-                  
-                  ElevatedButton(
-                    onPressed: _saveAnimal,
-                    child: Text(widget.animal == null ? 'Add Animal' : 'Update Animal'),
-                  ),
                 ],
-              ),
+
+                if (_photoSyncServiceReady && widget.animal != null)
+                  AnimalPhotoGallery(
+                    animalId: widget.animal!.id,
+                    existingPhotos: _photoUrls,
+                    photoSyncService: _photoSyncService!,
+                    onPhotoListChanged: (updatedList) {
+                      setState(() {
+                        _photoUrls = List<String>.from(updatedList.map((p) => p.split('/').last));
+                      });
+                    },
+                  ),
+
+                const SizedBox(height: 32),
+                
+                ElevatedButton(
+                  onPressed: _saveAnimal,
+                  child: Text(widget.animal == null ? 'Add Animal' : 'Update Animal'),
+                ),
+              ],
             ),
           ),
         );

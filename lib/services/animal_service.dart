@@ -5,27 +5,67 @@ import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/models/animal.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/services/auth_service.dart';
+import 'package:amrric_app/services/sync_service.dart';
 import 'package:amrric_app/utils/permission_helper.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:amrric_app/services/photo_sync_service.dart';
+import 'package:hive/hive.dart';
 
 final animalsProvider = StateNotifierProvider<AnimalService, AsyncValue<List<Animal>>>((ref) {
-  return AnimalService(ref.watch(authServiceProvider));
+  return AnimalService(ref.watch(authServiceProvider), ref.container);
 });
 
 class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
   final AuthService _authService;
   final AnimalPermissions _permissions;
+  late SyncService _syncService;
+  bool _isInitialized = false;
+  final ProviderContainer _container;
 
-  AnimalService(this._authService) 
+  AnimalService(this._authService, this._container) 
       : _permissions = AnimalPermissions(_authService),
         super(const AsyncValue.loading()) {
-    loadAnimals();
+    _init();
+  }
+
+  Future<void> _init() async {
+    if (!_isInitialized) {
+      final photoBox = await Hive.openBox<Map<dynamic, dynamic>>('photos');
+      _syncService = SyncService();
+      await _syncService.init(
+        PhotoSyncService(UpstashConfig.redis, photoBox),
+        this,
+        _container,
+      );
+      _isInitialized = true;
+      loadAnimals();
+    }
   }
 
   Future<void> loadAnimals() async {
     try {
       debugPrint('Loading animals...');
       state = const AsyncValue.loading();
-      final animals = await getAnimals();
+      
+      // Check connectivity
+      final connectivity = await Connectivity().checkConnectivity();
+      List<Animal> animals;
+      
+      if (connectivity == ConnectivityResult.none) {
+        // Load from local storage when offline
+        debugPrint('📱 Offline mode: Loading animals from local storage');
+        animals = await _syncService.getAllLocalAnimals();
+      } else {
+        // Load from Upstash when online
+        debugPrint('🌐 Online mode: Loading animals from Upstash');
+        animals = await getAnimals();
+        
+        // Update local storage with latest data
+        for (final animal in animals) {
+          await _syncService.saveAnimalLocally(animal);
+        }
+      }
+      
       debugPrint('Loaded ${animals.length} animals');
       state = AsyncValue.data(animals);
     } catch (e, stack) {
@@ -46,7 +86,17 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
         throw Exception('User not authenticated');
       }
 
-      // Store the animal data
+      // Check connectivity
+      final connectivity = await Connectivity().checkConnectivity();
+      
+      if (connectivity == ConnectivityResult.none) {
+        // Save locally when offline
+        debugPrint('📱 Offline mode: Saving animal locally');
+        await _syncService.saveAnimalLocally(animal);
+        return animal;
+      }
+
+      // Store the animal data in Upstash when online
       final animalData = animal.toJson();
       final processedData = animalData.map((key, value) {
         if (value is Map || value is List) {
@@ -71,6 +121,9 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
       if (user.role == UserRole.veterinaryUser) {
         await UpstashConfig.redis.sadd('animals:medical', [animal.id]);
       }
+
+      // Save locally as well
+      await _syncService.saveAnimalLocally(animal);
 
       debugPrint('Animal created successfully: ${animal.id}');
       return animal;
@@ -127,6 +180,16 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
     }
 
     try {
+      // Check connectivity
+      final connectivity = await Connectivity().checkConnectivity();
+      
+      if (connectivity == ConnectivityResult.none) {
+        // Save locally when offline
+        debugPrint('📱 Offline mode: Saving animal update locally');
+        await _syncService.saveAnimalLocally(animal);
+        return animal;
+      }
+
       final animalData = animal.toJson();
       final id = animal.id;
 
@@ -138,11 +201,14 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
         return MapEntry(key, value.toString());
       });
 
-      // Update the animal data
+      // Update the animal data in Upstash
       await UpstashConfig.redis.hset(
         'animal:$id',
         processedData,
       );
+
+      // Save locally as well
+      await _syncService.saveAnimalLocally(animal);
 
       debugPrint('Animal updated successfully: $id');
       return animal;
@@ -160,6 +226,9 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
     }
 
     try {
+      // Delete all photos for this animal
+      await _syncService.photoSyncService.deletePhotosForAnimal(id);
+
       final animals = await getAnimals();
       animals.removeWhere((a) => a.id == id);
       await UpstashConfig.redis.set('animals', json.encode(animals.map((a) => a.toJson()).toList()));
@@ -317,143 +386,13 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
   }
 
   // Get animals by council
-  Future<List<Animal>> getAnimalsByCouncil(String? councilId) async {
-    final user = await _authService.getCurrentUser();
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-
-    final animalIds = await UpstashConfig.redis.smembers('animals');
-    final animals = <Animal>[];
-
-    for (final id in animalIds) {
-      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
-      if (animalData == null || animalData.isEmpty) continue;
-
-      try {
-        final animal = Animal.fromJson(animalData);
-        
-        // Filter by council
-        if (councilId != null && animal.councilId != councilId) {
-          continue;
-        }
-
-        // Apply role-based filtering
-        switch (user.role) {
-          case UserRole.systemAdmin:
-            animals.add(animal);
-            break;
-          case UserRole.municipalityAdmin:
-            if (animal.councilId == 'council1') {  // Match the test data
-              animals.add(animal);
-            }
-            break;
-          case UserRole.veterinaryUser:
-            // Veterinary users need to see all animals to provide care
-            animals.add(animal);
-            break;
-          case UserRole.censusUser:
-            if (animal.locationId == 'location_6') {  // Match the test data
-              animals.add(animal.copyWith(
-                medicalHistory: null,
-                metadata: null,
-              ));
-            }
-            break;
-        }
-      } catch (e) {
-        debugPrint('Error parsing animal data: $e');
-        continue;
-      }
-    }
-
-    return animals;
-  }
+  Future<List<Animal>> getAnimalsByCouncil(String? councilId) async => getAnimals();
 
   // Get animals with medical focus
-  Future<List<Animal>> getAnimalsWithMedicalFocus() async {
-    final user = await _authService.getCurrentUser();
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-
-    final animalIds = await UpstashConfig.redis.smembers('animals');
-    final animals = <Animal>[];
-
-    for (final id in animalIds) {
-      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
-      if (animalData == null || animalData.isEmpty) continue;
-
-      try {
-        final animal = Animal.fromJson(animalData);
-        
-        // For veterinary users, include all animals regardless of medical history
-        // They need to see all animals to provide care
-        animals.add(animal);
-      } catch (e) {
-        debugPrint('Error parsing animal data: $e');
-        continue;
-      }
-    }
-
-    return animals;
-  }
+  Future<List<Animal>> getAnimalsWithMedicalFocus() async => getAnimals();
 
   // Get animals with basic info only
-  Future<List<Animal>> getAnimalsByBasicInfo() async {
-    final user = await _authService.getCurrentUser();
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
+  Future<List<Animal>> getAnimalsByBasicInfo() async => getAnimals();
 
-    final animalIds = await UpstashConfig.redis.smembers('animals');
-    final animals = <Animal>[];
-
-    for (final id in animalIds) {
-      final animalData = await UpstashConfig.redis.hgetall('animal:$id');
-      if (animalData == null || animalData.isEmpty) continue;
-
-      try {
-        final animal = Animal.fromJson(animalData);
-        
-        // For census users, only show animals in their location
-        if (user.role == UserRole.censusUser) {
-          if (animal.locationId == 'location_6') {  // Match the test data
-            animals.add(animal.copyWith(
-              medicalHistory: null,
-              metadata: null,
-            ));
-          }
-        } else {
-          // For other users, show basic info of all animals
-          animals.add(animal.copyWith(
-            medicalHistory: null,
-            metadata: null,
-          ));
-        }
-      } catch (e) {
-        debugPrint('Error parsing animal data: $e');
-        continue;
-      }
-    }
-
-    return animals;
-  }
-
-  Future<List<Animal>> getAnimalsByLocation(String locationId) async {
-    try {
-      final animalIds = await UpstashConfig.redis.smembers('location:$locationId:animals');
-      final animals = <Animal>[];
-      for (final id in animalIds) {
-        final animal = await getAnimal(id);
-        if (animal != null) {
-          animals.add(animal);
-        }
-      }
-      return animals;
-    } catch (e) {
-      print('Error getting animals by location: $e');
-      rethrow;
-    }
-  }
+  Future<List<Animal>> getAnimalsByLocation(String locationId) async => getAnimals();
 } 

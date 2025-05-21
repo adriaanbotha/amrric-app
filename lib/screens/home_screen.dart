@@ -10,6 +10,7 @@ import 'package:amrric_app/screens/admin/council_management_screen.dart';
 import 'package:amrric_app/screens/profile_screen.dart';
 import 'package:amrric_app/screens/admin/location_management_screen.dart';
 import 'package:amrric_app/screens/admin/animal_management_screen.dart';
+import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -27,7 +28,7 @@ class HomeScreen extends ConsumerWidget {
       );
     }
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('AMRRIC'),
         centerTitle: true,
