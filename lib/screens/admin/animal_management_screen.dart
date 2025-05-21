@@ -534,7 +534,15 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
     }
   }
 
-  void _showAddAnimalDialog() {
-    // Implementation of _showAddAnimalDialog method
+  void _showAddAnimalDialog() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AnimalFormScreen(),
+      ),
+    );
+    if (result == true) {
+      setState(() {});
+    }
   }
 } 

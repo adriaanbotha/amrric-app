@@ -30,7 +30,19 @@ class Animal with _$Animal {
     Map<String, dynamic>? metadata,
   }) = _Animal;
 
-  factory Animal.fromJson(Map<String, dynamic> json) => _$AnimalFromJson(json);
+  factory Animal.fromJson(Map<String, dynamic> json) {
+    // Ensure photoUrls is always a List<String>
+    if (json['photoUrls'] != null) {
+      if (json['photoUrls'] is List) {
+        json['photoUrls'] = (json['photoUrls'] as List).map((e) => e.toString()).toList();
+      } else {
+        json['photoUrls'] = [];
+      }
+    } else {
+      json['photoUrls'] = [];
+    }
+    return _$AnimalFromJson(json);
+  }
 }
 
 // Helper functions for JSON parsing

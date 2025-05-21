@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
+import 'package:amrric_app/services/auth_service.dart';
+import 'package:amrric_app/models/user.dart';
 
 class TestDataService {
   final GetIt ref = GetIt.I<GetIt>();
@@ -122,6 +124,11 @@ class TestDataService {
     debugPrint('Test animals created successfully');
   }
 
+  Future<void> fixCouncilLocationsStructure(String councilId) async {
+    // Delete the key so it can be recreated as a set
+    await _redis.del('council:$councilId:locations');
+  }
+
   Future<void> createTestCouncils() async {
     debugPrint('Creating test councils...');
     
@@ -164,6 +171,7 @@ class TestDataService {
     for (final council in testCouncils) {
       try {
         debugPrint('Converting Council to JSON: $council');
+        await fixCouncilLocationsStructure(council.id);
         await _redis.hset('council:${council.id}', council.toJson());
         await _redis.sadd('councils', [council.id]);
         debugPrint('Created council: ${council.name}');
@@ -173,6 +181,51 @@ class TestDataService {
     }
 
     debugPrint('All test councils created successfully');
+  }
+
+  Future<void> createTestUsers() async {
+    debugPrint('Creating test users...');
+    final authService = ref.read(authServiceProvider);
+
+    final testUsers = [
+      {
+        'email': 'admin@amrric.com',
+        'password': 'admin123',
+        'name': 'Admin User',
+        'role': UserRole.admin,
+        'councilId': 'council1',
+      },
+      {
+        'email': 'vet@amrric.com',
+        'password': 'vet123',
+        'name': 'Vet User',
+        'role': UserRole.veterinaryUser,
+        'councilId': 'council1',
+      },
+      {
+        'email': 'user@amrric.com',
+        'password': 'user123',
+        'name': 'Regular User',
+        'role': UserRole.user,
+        'councilId': 'council2',
+      },
+    ];
+
+    for (final user in testUsers) {
+      try {
+        await authService.createUser(
+          email: user['email'] as String,
+          password: user['password'] as String,
+          name: user['name'] as String,
+          role: user['role'] as UserRole,
+          councilId: user['councilId'] as String,
+        );
+        debugPrint('Created test user: ${user['email']}');
+      } catch (e) {
+        debugPrint('Error creating test user ${user['email']}: $e');
+      }
+    }
+    debugPrint('Test users created successfully');
   }
 
   Future<void> createTestData() async {

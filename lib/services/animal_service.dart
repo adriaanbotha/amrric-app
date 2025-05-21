@@ -86,18 +86,22 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
         throw Exception('User not authenticated');
       }
 
+      // Ensure photoUrls are file names only
+      final photoUrls = animal.photoUrls.map((url) => url.split('/').last).toList();
+      final updatedAnimal = animal.copyWith(photoUrls: photoUrls);
+
       // Check connectivity
       final connectivity = await Connectivity().checkConnectivity();
       
       if (connectivity == ConnectivityResult.none) {
         // Save locally when offline
         debugPrint('📱 Offline mode: Saving animal locally');
-        await _syncService.saveAnimalLocally(animal);
-        return animal;
+        await _syncService.saveAnimalLocally(updatedAnimal);
+        return updatedAnimal;
       }
 
       // Store the animal data in Upstash when online
-      final animalData = animal.toJson();
+      final animalData = updatedAnimal.toJson();
       final processedData = animalData.map((key, value) {
         if (value is Map || value is List) {
           return MapEntry(key, jsonEncode(value));
@@ -106,27 +110,27 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
       });
 
       await UpstashConfig.redis.hset(
-        'animal:${animal.id}',
+        'animal:${updatedAnimal.id}',
         processedData,
       );
 
       // Add the animal ID to the set of all animals
-      await UpstashConfig.redis.sadd('animals', [animal.id]);
+      await UpstashConfig.redis.sadd('animals', [updatedAnimal.id]);
 
       // Add to indexes
-      await UpstashConfig.redis.sadd('animals:all', [animal.id]);
-      await UpstashConfig.redis.sadd('animals:location:${animal.locationId}', [animal.id]);
-      await UpstashConfig.redis.sadd('animals:house:${animal.houseId}', [animal.id]);
+      await UpstashConfig.redis.sadd('animals:all', [updatedAnimal.id]);
+      await UpstashConfig.redis.sadd('animals:location:${updatedAnimal.locationId}', [updatedAnimal.id]);
+      await UpstashConfig.redis.sadd('animals:house:${updatedAnimal.houseId}', [updatedAnimal.id]);
 
       if (user.role == UserRole.veterinaryUser) {
-        await UpstashConfig.redis.sadd('animals:medical', [animal.id]);
+        await UpstashConfig.redis.sadd('animals:medical', [updatedAnimal.id]);
       }
 
       // Save locally as well
-      await _syncService.saveAnimalLocally(animal);
+      await _syncService.saveAnimalLocally(updatedAnimal);
 
-      debugPrint('Animal created successfully: ${animal.id}');
-      return animal;
+      debugPrint('Animal created successfully: ${updatedAnimal.id}');
+      return updatedAnimal;
     } catch (e, stackTrace) {
       debugPrint('Error creating animal: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -180,18 +184,22 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
     }
 
     try {
+      // Ensure photoUrls are file names only
+      final photoUrls = animal.photoUrls.map((url) => url.split('/').last).toList();
+      final updatedAnimal = animal.copyWith(photoUrls: photoUrls);
+
       // Check connectivity
       final connectivity = await Connectivity().checkConnectivity();
       
       if (connectivity == ConnectivityResult.none) {
         // Save locally when offline
         debugPrint('📱 Offline mode: Saving animal update locally');
-        await _syncService.saveAnimalLocally(animal);
-        return animal;
+        await _syncService.saveAnimalLocally(updatedAnimal);
+        return updatedAnimal;
       }
 
-      final animalData = animal.toJson();
-      final id = animal.id;
+      final animalData = updatedAnimal.toJson();
+      final id = updatedAnimal.id;
 
       // Convert complex types to JSON strings
       final processedData = animalData.map((key, value) {
@@ -208,10 +216,10 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
       );
 
       // Save locally as well
-      await _syncService.saveAnimalLocally(animal);
+      await _syncService.saveAnimalLocally(updatedAnimal);
 
       debugPrint('Animal updated successfully: $id');
-      return animal;
+      return updatedAnimal;
     } catch (e, stackTrace) {
       debugPrint('Error updating animal: $e');
       debugPrint('Stack trace: $stackTrace');
