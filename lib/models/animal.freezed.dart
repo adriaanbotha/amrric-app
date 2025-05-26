@@ -14,10 +14,6 @@ T _$identity<T>(T value) => value;
 final _privateConstructorUsedError = UnsupportedError(
     'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
-Animal _$AnimalFromJson(Map<String, dynamic> json) {
-  return _Animal.fromJson(json);
-}
-
 /// @nodoc
 mixin _$Animal {
   String get id => throw _privateConstructorUsedError;
@@ -43,9 +39,7 @@ mixin _$Animal {
       throw _privateConstructorUsedError;
   Map<String, dynamic>? get censusData => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
-
-  /// Serializes this Animal to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  List<AnimalImage>? get images => throw _privateConstructorUsedError;
 
   /// Create a copy of Animal
   /// with the given fields replaced by the non-null parameter values.
@@ -78,7 +72,8 @@ abstract class $AnimalCopyWith<$Res> {
       List<String> photoUrls,
       Map<String, dynamic>? medicalHistory,
       Map<String, dynamic>? censusData,
-      Map<String, dynamic>? metadata});
+      Map<String, dynamic>? metadata,
+      List<AnimalImage>? images});
 }
 
 /// @nodoc
@@ -116,6 +111,7 @@ class _$AnimalCopyWithImpl<$Res, $Val extends Animal>
     Object? medicalHistory = freezed,
     Object? censusData = freezed,
     Object? metadata = freezed,
+    Object? images = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -198,6 +194,10 @@ class _$AnimalCopyWithImpl<$Res, $Val extends Animal>
           ? _value.metadata
           : metadata // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
+      images: freezed == images
+          ? _value.images
+          : images // ignore: cast_nullable_to_non_nullable
+              as List<AnimalImage>?,
     ) as $Val);
   }
 }
@@ -229,7 +229,8 @@ abstract class _$$AnimalImplCopyWith<$Res> implements $AnimalCopyWith<$Res> {
       List<String> photoUrls,
       Map<String, dynamic>? medicalHistory,
       Map<String, dynamic>? censusData,
-      Map<String, dynamic>? metadata});
+      Map<String, dynamic>? metadata,
+      List<AnimalImage>? images});
 }
 
 /// @nodoc
@@ -265,6 +266,7 @@ class __$$AnimalImplCopyWithImpl<$Res>
     Object? medicalHistory = freezed,
     Object? censusData = freezed,
     Object? metadata = freezed,
+    Object? images = freezed,
   }) {
     return _then(_$AnimalImpl(
       id: null == id
@@ -347,12 +349,16 @@ class __$$AnimalImplCopyWithImpl<$Res>
           ? _value._metadata
           : metadata // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
+      images: freezed == images
+          ? _value._images
+          : images // ignore: cast_nullable_to_non_nullable
+              as List<AnimalImage>?,
     ));
   }
 }
 
 /// @nodoc
-@JsonSerializable()
+
 class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
   const _$AnimalImpl(
       {required this.id,
@@ -374,14 +380,13 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
       required final List<String> photoUrls,
       final Map<String, dynamic>? medicalHistory,
       final Map<String, dynamic>? censusData,
-      final Map<String, dynamic>? metadata})
+      final Map<String, dynamic>? metadata,
+      final List<AnimalImage>? images})
       : _photoUrls = photoUrls,
         _medicalHistory = medicalHistory,
         _censusData = censusData,
-        _metadata = metadata;
-
-  factory _$AnimalImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AnimalImplFromJson(json);
+        _metadata = metadata,
+        _images = images;
 
   @override
   final String id;
@@ -455,9 +460,19 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
     return EqualUnmodifiableMapView(value);
   }
 
+  final List<AnimalImage>? _images;
+  @override
+  List<AnimalImage>? get images {
+    final value = _images;
+    if (value == null) return null;
+    if (_images is EqualUnmodifiableListView) return _images;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'Animal(id: $id, name: $name, species: $species, breed: $breed, color: $color, sex: $sex, estimatedAge: $estimatedAge, weight: $weight, microchipNumber: $microchipNumber, registrationDate: $registrationDate, lastUpdated: $lastUpdated, isActive: $isActive, houseId: $houseId, locationId: $locationId, councilId: $councilId, ownerId: $ownerId, photoUrls: $photoUrls, medicalHistory: $medicalHistory, censusData: $censusData, metadata: $metadata)';
+    return 'Animal(id: $id, name: $name, species: $species, breed: $breed, color: $color, sex: $sex, estimatedAge: $estimatedAge, weight: $weight, microchipNumber: $microchipNumber, registrationDate: $registrationDate, lastUpdated: $lastUpdated, isActive: $isActive, houseId: $houseId, locationId: $locationId, councilId: $councilId, ownerId: $ownerId, photoUrls: $photoUrls, medicalHistory: $medicalHistory, censusData: $censusData, metadata: $metadata, images: $images)';
   }
 
   @override
@@ -484,7 +499,8 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
       ..add(DiagnosticsProperty('photoUrls', photoUrls))
       ..add(DiagnosticsProperty('medicalHistory', medicalHistory))
       ..add(DiagnosticsProperty('censusData', censusData))
-      ..add(DiagnosticsProperty('metadata', metadata));
+      ..add(DiagnosticsProperty('metadata', metadata))
+      ..add(DiagnosticsProperty('images', images));
   }
 
   @override
@@ -521,10 +537,10 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
                 .equals(other._medicalHistory, _medicalHistory) &&
             const DeepCollectionEquality()
                 .equals(other._censusData, _censusData) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata));
+            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
+            const DeepCollectionEquality().equals(other._images, _images));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hashAll([
         runtimeType,
@@ -547,7 +563,8 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
         const DeepCollectionEquality().hash(_photoUrls),
         const DeepCollectionEquality().hash(_medicalHistory),
         const DeepCollectionEquality().hash(_censusData),
-        const DeepCollectionEquality().hash(_metadata)
+        const DeepCollectionEquality().hash(_metadata),
+        const DeepCollectionEquality().hash(_images)
       ]);
 
   /// Create a copy of Animal
@@ -557,13 +574,6 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
   @pragma('vm:prefer-inline')
   _$$AnimalImplCopyWith<_$AnimalImpl> get copyWith =>
       __$$AnimalImplCopyWithImpl<_$AnimalImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AnimalImplToJson(
-      this,
-    );
-  }
 }
 
 abstract class _Animal implements Animal {
@@ -587,9 +597,8 @@ abstract class _Animal implements Animal {
       required final List<String> photoUrls,
       final Map<String, dynamic>? medicalHistory,
       final Map<String, dynamic>? censusData,
-      final Map<String, dynamic>? metadata}) = _$AnimalImpl;
-
-  factory _Animal.fromJson(Map<String, dynamic> json) = _$AnimalImpl.fromJson;
+      final Map<String, dynamic>? metadata,
+      final List<AnimalImage>? images}) = _$AnimalImpl;
 
   @override
   String get id;
@@ -633,6 +642,8 @@ abstract class _Animal implements Animal {
   Map<String, dynamic>? get censusData;
   @override
   Map<String, dynamic>? get metadata;
+  @override
+  List<AnimalImage>? get images;
 
   /// Create a copy of Animal
   /// with the given fields replaced by the non-null parameter values.

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/models/user.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:hive/hive.dart';
 
 class AuthService {
   static const String _usersKey = 'users';
@@ -96,55 +98,35 @@ class AuthService {
   }
 
   Future<User?> login(String email, String password) async {
-    return _withRetry(() async {
-      try {
-        // Get user data from Redis using the correct key format
-        final userJson = await UpstashConfig.redis.hgetall('user:$email');
-        if (userJson == null || userJson.isEmpty) {
-          throw Exception('Invalid credentials');
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final isOnline = connectivityResult != ConnectivityResult.none;
+
+      if (isOnline) {
+        // Online: Fetch user from Upstash
+        final userData = await UpstashConfig.redis.hgetall('user:$email');
+        if (userData == null || userData.isEmpty) return null;
+
+        final user = User.fromJson(userData);
+        if (user.password != password) return null;
+
+        // Save user locally for offline access
+        final userBox = await Hive.openBox<User>('users');
+        await userBox.put(email, user);
+        return user;
+      } else {
+        // Offline: Check local storage
+        final userBox = await Hive.openBox<User>('users');
+        final user = userBox.get(email);
+        if (user == null || user.password != password) {
+          throw Exception('Offline login not allowed. Please log in online first.');
         }
-
-        // Convert Redis hash to User object
-        final user = User.fromJson(userJson.map((key, value) => MapEntry(key, value.toString())));
-
-        // Verify password
-        final storedPassword = await UpstashConfig.redis.get('password:$email');
-        if (storedPassword != password) {
-          throw Exception('Invalid credentials');
-        }
-
-        // Update last login and activity log
-        final updatedUser = user.copyWith(
-          lastLogin: DateTime.now(),
-          activityLog: [
-            ...user.activityLog,
-            {
-              'timestamp': DateTime.now().toIso8601String(),
-              'action': 'login_success',
-              'details': 'User logged in successfully',
-            },
-          ],
-        );
-
-        // Save updated user data
-        final userData = updatedUser.toJson();
-        final redisData = userData.map((key, value) {
-          if (value is List) {
-            return MapEntry(key, jsonEncode(value));
-          } else {
-            return MapEntry(key, value?.toString() ?? '');
-          }
-        });
-        await UpstashConfig.redis.hset('user:$email', redisData);
-
-        // Set as current user
-        await setCurrentUser(updatedUser);
-        return updatedUser;
-      } catch (e) {
-        debugPrint('Error logging in: $e');
-        return null;
+        return user;
       }
-    });
+    } catch (e) {
+      debugPrint('Error logging in: $e');
+      return null;
+    }
   }
 
   bool hasPermission(String permission) {

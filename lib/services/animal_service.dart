@@ -10,6 +10,7 @@ import 'package:amrric_app/utils/permission_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:amrric_app/services/photo_sync_service.dart';
 import 'package:hive/hive.dart';
+import 'package:amrric_app/models/animal_image.dart';
 
 final animalsProvider = StateNotifierProvider<AnimalService, AsyncValue<List<Animal>>>((ref) {
   return AnimalService(ref.watch(authServiceProvider), ref.container);
@@ -403,4 +404,38 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
   Future<List<Animal>> getAnimalsByBasicInfo() async => getAnimals();
 
   Future<List<Animal>> getAnimalsByLocation(String locationId) async => getAnimals();
+
+  Future<Animal?> getAnimalById(String id) async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final isOnline = connectivityResult != ConnectivityResult.none;
+
+      if (isOnline) {
+        // Online: Fetch from Upstash
+        final animalData = await UpstashConfig.redis.hgetall('animal:$id');
+        if (animalData == null || animalData.isEmpty) return null;
+
+        final animal = Animal.fromJson(animalData);
+        // Fetch images from Upstash
+        final imageKeys = await UpstashConfig.redis.smembers('animal:$id:images');
+        final images = await Future.wait(
+          imageKeys.map((key) => UpstashConfig.redis.hgetall(key)).toList(),
+        );
+        animal.images = images
+            .where((img) => img != null && img.isNotEmpty)
+            .map((img) => AnimalImage.fromJson(img!))
+            .toList();
+        return animal;
+      } else {
+        // Offline: Fetch from local storage (Hive)
+        final animalBox = await Hive.openBox<Animal>('animals');
+        final animal = animalBox.get(id);
+        // Skip image retrieval in offline mode
+        return animal;
+      }
+    } catch (e) {
+      debugPrint('Error getting animal: $e');
+      return null;
+    }
+  }
 } 

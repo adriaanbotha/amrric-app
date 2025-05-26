@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:amrric_app/models/animal_image.dart';
 
 part 'animal.freezed.dart';
 part 'animal.g.dart';
@@ -28,6 +29,7 @@ class Animal with _$Animal {
     Map<String, dynamic>? medicalHistory,
     Map<String, dynamic>? censusData,
     Map<String, dynamic>? metadata,
+    List<AnimalImage>? images,
   }) = _Animal;
 
   factory Animal.fromJson(Map<String, dynamic> json) {
