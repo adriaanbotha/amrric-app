@@ -153,6 +153,7 @@ class HomeScreen extends ConsumerWidget {
               title: const Text('Logout'),
               onTap: () async {
                 await authService.logout();
+                await authService.clearLastLoggedInEmail();
                 ref.read(authStateProvider.notifier).state = null;
                 ref.invalidate(authServiceProvider);
                 if (context.mounted) {

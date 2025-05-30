@@ -5,6 +5,8 @@ import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hive/hive.dart';
+import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   static const String _usersKey = 'users';
@@ -30,33 +32,60 @@ class AuthService {
     }
   }
 
+  Future<void> setLastLoggedInEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_logged_in_email', email);
+  }
+
+  Future<String?> getLastLoggedInEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('last_logged_in_email');
+  }
+
+  Future<void> clearLastLoggedInEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_logged_in_email');
+  }
+
   Future<User?> getCurrentUser() async {
-    return _withRetry(() async {
-      try {
-        // First try to get as hash
-        final userHash = await UpstashConfig.redis.hgetall(_currentUserKey);
-        if (userHash != null && userHash.isNotEmpty) {
-          _currentUser = User.fromJson(userHash.map((key, value) => MapEntry(key, value.toString())));
-          return _currentUser;
-        }
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final isOnline = connectivityResult != ConnectivityResult.none;
 
-        // If not found as hash, try as string (old format)
-        final userJson = await UpstashConfig.redis.get(_currentUserKey);
-        if (userJson == null) {
-          _currentUser = null;
-          return null;
+      if (isOnline) {
+        // Try Upstash first
+        try {
+          final userHash = await UpstashConfig.redis.hgetall(_currentUserKey);
+          if (userHash != null && userHash.isNotEmpty) {
+            _currentUser = User.fromJson(userHash.map((key, value) => MapEntry(key, value.toString())));
+            return _currentUser;
+          }
+          final userJson = await UpstashConfig.redis.get(_currentUserKey);
+          if (userJson != null) {
+            final user = User.fromJson(json.decode(userJson));
+            await setCurrentUser(user);
+            return user;
+          }
+        } catch (e) {
+          debugPrint('Online getCurrentUser failed, falling back to offline: $e');
+          // Fallback to offline
         }
-
-        // Convert old format to new format
-        final user = User.fromJson(json.decode(userJson));
-        await setCurrentUser(user); // This will store in new format
-        return user;
-      } catch (e) {
-        debugPrint('Error getting current user: $e');
-        _currentUser = null;
-        return null;
       }
-    });
+
+      // Offline or Upstash failed: get from Hive
+      final userBox = await Hive.openBox<User>('users');
+      final lastEmail = await getLastLoggedInEmail();
+      if (lastEmail != null) {
+        final user = userBox.get(lastEmail);
+        _currentUser = user;
+        return user;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting current user: $e');
+      _currentUser = null;
+      return null;
+    }
   }
 
   User? get currentUser => _currentUser;
@@ -90,11 +119,16 @@ class AuthService {
       try {
         await UpstashConfig.redis.del([_currentUserKey]);
         _currentUser = null;
+        // Do not clear authStateProvider here; handle it in the UI after logout.
       } catch (e) {
         debugPrint('Error logging out: $e');
         rethrow;
       }
     });
+  }
+
+  String hashPassword(String password) {
+    return sha256.convert(utf8.encode(password)).toString();
   }
 
   Future<User?> login(String email, String password) async {
@@ -103,26 +137,54 @@ class AuthService {
       final isOnline = connectivityResult != ConnectivityResult.none;
 
       if (isOnline) {
-        // Online: Fetch user from Upstash
-        final userData = await UpstashConfig.redis.hgetall('user:$email');
-        if (userData == null || userData.isEmpty) return null;
-
-        final user = User.fromJson(userData);
-        if (user.password != password) return null;
-
-        // Save user locally for offline access
-        final userBox = await Hive.openBox<User>('users');
-        await userBox.put(email, user);
-        return user;
-      } else {
-        // Offline: Check local storage
-        final userBox = await Hive.openBox<User>('users');
-        final user = userBox.get(email);
-        if (user == null || user.password != password) {
-          throw Exception('Offline login not allowed. Please log in online first.');
+        try {
+          // Online: Try Upstash
+          final userData = await UpstashConfig.redis.hgetall('user:$email');
+          if (userData == null || userData.isEmpty) {
+            debugPrint('No user data found for email: $email');
+            return null;
+          }
+          final storedPassword = await UpstashConfig.redis.get('password:$email');
+          if (storedPassword != password) {
+            debugPrint('Invalid password for email: $email');
+            return null;
+          }
+          final user = User.fromJson(userData.map((key, value) => MapEntry(key, value.toString())));
+          final updatedUser = user.copyWith(
+            lastLogin: DateTime.now(),
+            activityLog: [
+              ...user.activityLog,
+              {
+                'timestamp': DateTime.now().toIso8601String(),
+                'action': 'login',
+                'details': 'User logged in successfully',
+              },
+            ],
+            localPasswordHash: hashPassword(password),
+          );
+          await updateUser(updatedUser);
+          await setCurrentUser(updatedUser);
+          final userBox = await Hive.openBox<User>('users');
+          await userBox.put(email, updatedUser);
+          await setLastLoggedInEmail(email);
+          return updatedUser;
+        } catch (e) {
+          debugPrint('Online login failed, falling back to offline: $e');
+          // Fallback to offline
         }
-        return user;
       }
+
+      // Offline: Check local storage
+      final userBox = await Hive.openBox<User>('users');
+      final user = userBox.get(email);
+      if (user == null) {
+        throw Exception('Offline login not allowed. Please log in online first.');
+      }
+      if (user.localPasswordHash != hashPassword(password)) {
+        throw Exception('Incorrect password for offline login.');
+      }
+      await setLastLoggedInEmail(email);
+      return user;
     } catch (e) {
       debugPrint('Error logging in: $e');
       return null;

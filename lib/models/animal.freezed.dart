@@ -27,7 +27,9 @@ mixin _$Animal {
   @JsonKey(fromJson: _parseWeight)
   double? get weight => throw _privateConstructorUsedError;
   String? get microchipNumber => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _parseRequiredDateTime)
   DateTime get registrationDate => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _parseRequiredDateTime)
   DateTime get lastUpdated => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
   String get houseId => throw _privateConstructorUsedError;
@@ -39,6 +41,7 @@ mixin _$Animal {
       throw _privateConstructorUsedError;
   Map<String, dynamic>? get censusData => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _parseImages)
   List<AnimalImage>? get images => throw _privateConstructorUsedError;
 
   /// Create a copy of Animal
@@ -62,8 +65,8 @@ abstract class $AnimalCopyWith<$Res> {
       @JsonKey(fromJson: _parseEstimatedAge) int? estimatedAge,
       @JsonKey(fromJson: _parseWeight) double? weight,
       String? microchipNumber,
-      DateTime registrationDate,
-      DateTime lastUpdated,
+      @JsonKey(fromJson: _parseRequiredDateTime) DateTime registrationDate,
+      @JsonKey(fromJson: _parseRequiredDateTime) DateTime lastUpdated,
       bool isActive,
       String houseId,
       String locationId,
@@ -73,7 +76,7 @@ abstract class $AnimalCopyWith<$Res> {
       Map<String, dynamic>? medicalHistory,
       Map<String, dynamic>? censusData,
       Map<String, dynamic>? metadata,
-      List<AnimalImage>? images});
+      @JsonKey(fromJson: _parseImages) List<AnimalImage>? images});
 }
 
 /// @nodoc
@@ -219,8 +222,8 @@ abstract class _$$AnimalImplCopyWith<$Res> implements $AnimalCopyWith<$Res> {
       @JsonKey(fromJson: _parseEstimatedAge) int? estimatedAge,
       @JsonKey(fromJson: _parseWeight) double? weight,
       String? microchipNumber,
-      DateTime registrationDate,
-      DateTime lastUpdated,
+      @JsonKey(fromJson: _parseRequiredDateTime) DateTime registrationDate,
+      @JsonKey(fromJson: _parseRequiredDateTime) DateTime lastUpdated,
       bool isActive,
       String houseId,
       String locationId,
@@ -230,7 +233,7 @@ abstract class _$$AnimalImplCopyWith<$Res> implements $AnimalCopyWith<$Res> {
       Map<String, dynamic>? medicalHistory,
       Map<String, dynamic>? censusData,
       Map<String, dynamic>? metadata,
-      List<AnimalImage>? images});
+      @JsonKey(fromJson: _parseImages) List<AnimalImage>? images});
 }
 
 /// @nodoc
@@ -359,7 +362,7 @@ class __$$AnimalImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
+class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
   const _$AnimalImpl(
       {required this.id,
       this.name,
@@ -370,8 +373,8 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
       @JsonKey(fromJson: _parseEstimatedAge) this.estimatedAge,
       @JsonKey(fromJson: _parseWeight) this.weight,
       this.microchipNumber,
-      required this.registrationDate,
-      required this.lastUpdated,
+      @JsonKey(fromJson: _parseRequiredDateTime) required this.registrationDate,
+      @JsonKey(fromJson: _parseRequiredDateTime) required this.lastUpdated,
       required this.isActive,
       required this.houseId,
       required this.locationId,
@@ -381,12 +384,13 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
       final Map<String, dynamic>? medicalHistory,
       final Map<String, dynamic>? censusData,
       final Map<String, dynamic>? metadata,
-      final List<AnimalImage>? images})
+      @JsonKey(fromJson: _parseImages) final List<AnimalImage>? images})
       : _photoUrls = photoUrls,
         _medicalHistory = medicalHistory,
         _censusData = censusData,
         _metadata = metadata,
-        _images = images;
+        _images = images,
+        super._();
 
   @override
   final String id;
@@ -409,8 +413,10 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
   @override
   final String? microchipNumber;
   @override
+  @JsonKey(fromJson: _parseRequiredDateTime)
   final DateTime registrationDate;
   @override
+  @JsonKey(fromJson: _parseRequiredDateTime)
   final DateTime lastUpdated;
   @override
   final bool isActive;
@@ -462,6 +468,7 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
 
   final List<AnimalImage>? _images;
   @override
+  @JsonKey(fromJson: _parseImages)
   List<AnimalImage>? get images {
     final value = _images;
     if (value == null) return null;
@@ -576,29 +583,33 @@ class _$AnimalImpl with DiagnosticableTreeMixin implements _Animal {
       __$$AnimalImplCopyWithImpl<_$AnimalImpl>(this, _$identity);
 }
 
-abstract class _Animal implements Animal {
+abstract class _Animal extends Animal {
   const factory _Animal(
-      {required final String id,
-      final String? name,
-      required final String species,
-      final String? breed,
-      final String? color,
-      required final String sex,
-      @JsonKey(fromJson: _parseEstimatedAge) final int? estimatedAge,
-      @JsonKey(fromJson: _parseWeight) final double? weight,
-      final String? microchipNumber,
-      required final DateTime registrationDate,
-      required final DateTime lastUpdated,
-      required final bool isActive,
-      required final String houseId,
-      required final String locationId,
-      required final String councilId,
-      final String? ownerId,
-      required final List<String> photoUrls,
-      final Map<String, dynamic>? medicalHistory,
-      final Map<String, dynamic>? censusData,
-      final Map<String, dynamic>? metadata,
-      final List<AnimalImage>? images}) = _$AnimalImpl;
+          {required final String id,
+          final String? name,
+          required final String species,
+          final String? breed,
+          final String? color,
+          required final String sex,
+          @JsonKey(fromJson: _parseEstimatedAge) final int? estimatedAge,
+          @JsonKey(fromJson: _parseWeight) final double? weight,
+          final String? microchipNumber,
+          @JsonKey(fromJson: _parseRequiredDateTime)
+          required final DateTime registrationDate,
+          @JsonKey(fromJson: _parseRequiredDateTime)
+          required final DateTime lastUpdated,
+          required final bool isActive,
+          required final String houseId,
+          required final String locationId,
+          required final String councilId,
+          final String? ownerId,
+          required final List<String> photoUrls,
+          final Map<String, dynamic>? medicalHistory,
+          final Map<String, dynamic>? censusData,
+          final Map<String, dynamic>? metadata,
+          @JsonKey(fromJson: _parseImages) final List<AnimalImage>? images}) =
+      _$AnimalImpl;
+  const _Animal._() : super._();
 
   @override
   String get id;
@@ -621,8 +632,10 @@ abstract class _Animal implements Animal {
   @override
   String? get microchipNumber;
   @override
+  @JsonKey(fromJson: _parseRequiredDateTime)
   DateTime get registrationDate;
   @override
+  @JsonKey(fromJson: _parseRequiredDateTime)
   DateTime get lastUpdated;
   @override
   bool get isActive;
@@ -643,6 +656,7 @@ abstract class _Animal implements Animal {
   @override
   Map<String, dynamic>? get metadata;
   @override
+  @JsonKey(fromJson: _parseImages)
   List<AnimalImage>? get images;
 
   /// Create a copy of Animal

@@ -1,28 +1,52 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:amrric_app/config/upstash_config.dart';
+import 'package:hive/hive.dart';
 
+part 'user.g.dart';
+
+@HiveType(typeId: 0)
 enum UserRole {
+  @HiveField(0)
   systemAdmin,
+  @HiveField(1)
   municipalityAdmin,
+  @HiveField(2)
   veterinaryUser,
+  @HiveField(3)
   censusUser,
 }
 
+@HiveType(typeId: 1)
 class User {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String email;
+  @HiveField(2)
   final String name;
+  @HiveField(3)
   final UserRole role;
+  @HiveField(4)
   final String? municipalityId; // For municipality admin
+  @HiveField(5)
   final String? councilId; // For council-specific operations
+  @HiveField(6)
   final String? locationId; // For location-specific operations
+  @HiveField(7)
   final DateTime? lastLogin;
+  @HiveField(8)
   final bool isActive;
+  @HiveField(9)
   final int loginAttempts;
+  @HiveField(10)
   final List<Map<String, dynamic>> activityLog;
+  @HiveField(11)
   final DateTime createdAt;
+  @HiveField(12)
   final DateTime updatedAt;
+  @HiveField(13)
+  final String? localPasswordHash;
 
   User({
     required this.id,
@@ -38,6 +62,7 @@ class User {
     List<Map<String, dynamic>>? activityLog,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.localPasswordHash,
   }) : activityLog = activityLog ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
@@ -148,6 +173,7 @@ class User {
         activityLog: activityLog,
         createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
         updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : DateTime.now(),
+        localPasswordHash: json['localPasswordHash']?.toString(),
       );
     } catch (e, stack) {
       debugPrint('Error parsing User from JSON: $e');
@@ -172,6 +198,7 @@ class User {
       'activityLog': activityLog,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'localPasswordHash': localPasswordHash,
     };
   }
 
@@ -194,6 +221,7 @@ class User {
     List<Map<String, dynamic>>? activityLog,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? localPasswordHash,
   }) {
     debugPrint('Creating copy of User with changes: ${{'id': id, 'email': email, 'name': name, 'role': role, 'isActive': isActive, 'loginAttempts': loginAttempts}}');
     return User(
@@ -207,9 +235,10 @@ class User {
       lastLogin: lastLogin ?? this.lastLogin,
       isActive: isActive ?? this.isActive,
       loginAttempts: loginAttempts ?? this.loginAttempts,
-      activityLog: activityLog ?? this.activityLog,
+      activityLog: activityLog ?? List.from(this.activityLog),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      localPasswordHash: localPasswordHash ?? this.localPasswordHash,
     );
   }
 

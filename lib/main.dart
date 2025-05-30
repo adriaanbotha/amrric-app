@@ -18,18 +18,36 @@ import 'package:amrric_app/config/upstash_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:amrric_app/models/user.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Hive
-  final appDocumentDir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(appDocumentDir.path);
-  
-  // Initialize Upstash
-  await UpstashConfig.initialize();
-  
-  runApp(const ProviderScope(child: AmrricApp()));
+  try {
+    // Initialize Hive
+    final appDocumentDir = await getApplicationDocumentsDirectory();
+    await Hive.initFlutter(appDocumentDir.path);
+    
+    // Register Hive adapters
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(UserRoleAdapter());
+    }
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(UserAdapter());
+    }
+    
+    // Open Hive boxes
+    await Hive.openBox<User>('users');
+    
+    // Initialize Upstash
+    await UpstashConfig.initialize();
+    
+    runApp(const ProviderScope(child: AmrricApp()));
+  } catch (e, stack) {
+    debugPrint('Error during initialization: $e');
+    debugPrint('Stack trace: $stack');
+    runApp(const ErrorApp());
+  }
 }
 
 class AmrricApp extends ConsumerStatefulWidget {

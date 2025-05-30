@@ -27,6 +27,7 @@ import 'package:amrric_app/models/weight.dart';
 import 'package:amrric_app/models/microchip_number.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'dart:convert';
+import 'package:hive/hive.dart';
 
 Future<void> resetTestData() async {
   try {
@@ -178,198 +179,109 @@ Future<void> verifyTestData() async {
 
 Future<void> createTestUsers() async {
   debugPrint('Creating test users...');
+  final now = DateTime.now();
+  
   final users = [
-    {
-      'id': '1',
-      'email': 'admin@amrric.com',
-      'name': 'System Admin',
-      'role': UserRole.systemAdmin,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
+    User(
+      id: '1',
+      email: 'admin@amrric.com',
+      name: 'System Admin',
+      role: UserRole.systemAdmin,
+      lastLogin: now,
+      isActive: true,
+      loginAttempts: 0,
+      activityLog: [
         {
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': now.toIso8601String(),
           'action': 'account_created',
           'details': 'Test account created',
         }
       ],
-    },
-    {
-      'id': '2',
-      'email': 'municipal@amrric.com',
-      'name': 'Municipality Admin',
-      'role': UserRole.municipalityAdmin,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
+      createdAt: now,
+      updatedAt: now,
+    ),
+    User(
+      id: '2',
+      email: 'municipal@amrric.com',
+      name: 'Municipality Admin',
+      role: UserRole.municipalityAdmin,
+      lastLogin: now,
+      isActive: true,
+      loginAttempts: 0,
+      activityLog: [
         {
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': now.toIso8601String(),
           'action': 'account_created',
           'details': 'Test account created',
         }
       ],
-      'councilId': 'council1',
-    },
-    {
-      'id': '3',
-      'email': 'vet@amrric.com',
-      'name': 'Veterinary User',
-      'role': UserRole.veterinaryUser,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
+      councilId: 'council1',
+      createdAt: now,
+      updatedAt: now,
+    ),
+    User(
+      id: '3',
+      email: 'vet@amrric.com',
+      name: 'Veterinary User',
+      role: UserRole.veterinaryUser,
+      lastLogin: now,
+      isActive: true,
+      loginAttempts: 0,
+      activityLog: [
         {
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': now.toIso8601String(),
           'action': 'account_created',
           'details': 'Test account created',
         }
       ],
-    },
-    {
-      'id': '4',
-      'email': 'census@amrric.com',
-      'name': 'Census User',
-      'role': UserRole.censusUser,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
+      createdAt: now,
+      updatedAt: now,
+    ),
+    User(
+      id: '4',
+      email: 'census@amrric.com',
+      name: 'Census User',
+      role: UserRole.censusUser,
+      lastLogin: now,
+      isActive: true,
+      loginAttempts: 0,
+      activityLog: [
         {
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': now.toIso8601String(),
           'action': 'account_created',
           'details': 'Test account created',
         }
       ],
-    },
-    {
-      'id': '5',
-      'email': 'vet2@amrric.com',
-      'name': 'Dr. Sarah Johnson',
-      'role': UserRole.veterinaryUser,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
-        {
-          'timestamp': DateTime.now().toIso8601String(),
-          'action': 'account_created',
-          'details': 'Test account created',
-        }
-      ],
-    },
-    {
-      'id': '6',
-      'email': 'municipal2@amrric.com',
-      'name': 'John Smith',
-      'role': UserRole.municipalityAdmin,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
-        {
-          'timestamp': DateTime.now().toIso8601String(),
-          'action': 'account_created',
-          'details': 'Test account created',
-        }
-      ],
-      'councilId': 'council2',
-    },
-    {
-      'id': '7',
-      'email': 'census2@amrric.com',
-      'name': 'Emma Wilson',
-      'role': UserRole.censusUser,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
-        {
-          'timestamp': DateTime.now().toIso8601String(),
-          'action': 'account_created',
-          'details': 'Test account created',
-        }
-      ],
-    },
-    {
-      'id': '8',
-      'email': 'municipal3@amrric.com',
-      'name': 'Michael Brown',
-      'role': UserRole.municipalityAdmin,
-      'lastLogin': DateTime.now(),
-      'isActive': true,
-      'loginAttempts': 0,
-      'activityLog': <Map<String, dynamic>>[
-        {
-          'timestamp': DateTime.now().toIso8601String(),
-          'action': 'account_created',
-          'details': 'Test account created',
-        }
-      ],
-      'councilId': 'council3',
-    }
+      createdAt: now,
+      updatedAt: now,
+    ),
   ];
 
   for (final user in users) {
     try {
-      debugPrint('Creating user: ${user['email']}');
-      
-      // Create the User object with explicit type casting
-      final userObj = User(
-        id: user['id'] as String,
-        email: user['email'] as String,
-        name: user['name'] as String,
-        role: user['role'] as UserRole,
-        lastLogin: user['lastLogin'] as DateTime,
-        isActive: user['isActive'] as bool,
-        loginAttempts: user['loginAttempts'] as int,
-        activityLog: (user['activityLog'] as List).cast<Map<String, dynamic>>(),
-        municipalityId: user['municipalityId'] as String?,
-        councilId: user['councilId'] as String?,
-      );
-
-      // Convert to JSON with proper serialization
-      final userData = userObj.toJson();
-      debugPrint('User data to store: $userData');
-      
-      // Convert all values to strings for Redis, ensuring proper type handling
+      final userData = user.toJson();
       final redisData = userData.map((key, value) {
-        if (value is bool) {
-          return MapEntry(key, value.toString());
-        } else if (value is List) {
+        if (value is List) {
           return MapEntry(key, jsonEncode(value));
         } else {
           return MapEntry(key, value?.toString() ?? '');
         }
       });
-      debugPrint('Redis data to store: $redisData');
       
-      await UpstashConfig.redis.hset(
-        'user:${user['email']}',
-        redisData,
-      );
+      await UpstashConfig.redis.hset('user:${user.email}', redisData);
+      await UpstashConfig.redis.set('password:${user.email}', '${user.email.split('@')[0]}123');
       
-      debugPrint('Storing password for user: ${user['email']}');
-      // Set the correct password for each user based on their role
-      final password = switch (user['role']) {
-        UserRole.systemAdmin => 'admin123',
-        UserRole.municipalityAdmin => 'municipal123',
-        UserRole.veterinaryUser => 'vet123',
-        UserRole.censusUser => 'census123',
-        _ => user['email'] as String,
-      };
-      await UpstashConfig.redis.set('password:${user['email']}', password);
-      debugPrint('Password stored successfully for user: ${user['email']}');
-      debugPrint('User ${user['email']} created successfully');
-    } catch (e, stack) {
-      debugPrint('Error creating user ${user['email']}: $e');
-      debugPrint('Stack trace: $stack');
+      // Store in Hive for offline access
+      final userBox = await Hive.openBox<User>('users');
+      await userBox.put(user.email, user);
+      
+      debugPrint('Created user: ${user.email}');
+    } catch (e) {
+      debugPrint('Error creating user ${user.email}: $e');
       rethrow;
     }
   }
-
+  
   debugPrint('All test users created successfully');
 }
 

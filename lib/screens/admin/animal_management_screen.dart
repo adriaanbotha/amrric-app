@@ -542,6 +542,8 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
       ),
     );
     if (result == true) {
+      // Reload animals after adding
+      await ref.read(animalsProvider.notifier).loadAnimals();
       setState(() {});
     }
   }

@@ -6,6 +6,7 @@ import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/config/test_data.dart';
 import 'package:amrric_app/screens/home_screen.dart';
+import 'package:hive/hive.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -160,6 +161,60 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _login();
   }
 
+  Future<void> _clearLocalStorage() async {
+    if (_isResetting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Local Storage?'),
+        content: const Text(
+          'This will delete all local data stored on this device. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isResetting = true);
+
+    try {
+      // Clear all Hive boxes
+      await Hive.deleteBoxFromDisk('users');
+      await Hive.deleteBoxFromDisk('animals');
+      await Hive.deleteBoxFromDisk('photos');
+      await Hive.deleteBoxFromDisk('councils');
+      await Hive.deleteBoxFromDisk('locations');
+      await Hive.deleteBoxFromDisk('houses');
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Local storage cleared successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to clear local storage: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isResetting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -281,10 +336,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 32),
                   // Debug Buttons
                   if (kDebugMode)
-                    Column(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: _isResetting ? null : _clearUpstashData,
+                          onPressed: _isResetting ? null : _clearLocalStorage,
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             foregroundColor: Colors.red,
@@ -296,11 +352,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.delete_forever),
-                          label: const Text('Debug: Clear Upstash Data'),
+                          label: const Text('Clear Local'),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          onPressed: _isResetting ? null : _populateTestData,
+                          onPressed: _isResetting ? null : _resetDatabase,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: Colors.orange,
+                          ),
+                          icon: _isResetting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.refresh),
+                          label: const Text('Reset DB'),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _isResetting ? null : () async {
+                            await createTestData();
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Test data populated successfully')),
+                            );
+                          },
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             foregroundColor: Colors.green,
@@ -312,7 +390,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.add_circle),
-                          label: const Text('Debug: Populate Test Data'),
+                          label: const Text('Populate Data'),
                         ),
                       ],
                     ),
@@ -323,100 +401,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _clearUpstashData() async {
-    if (_isResetting) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear Upstash Data?'),
-        content: const Text(
-          'This will delete all existing data from Upstash. '
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isResetting = true);
-
-    try {
-      await UpstashConfig.reset();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upstash data cleared successfully')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to clear Upstash data: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isResetting = false);
-      }
-    }
-  }
-
-  Future<void> _populateTestData() async {
-    if (_isResetting) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Populate Test Data?'),
-        content: const Text(
-          'This will create test data in Upstash. '
-          'Existing data will be preserved.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.green),
-            child: const Text('Populate'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isResetting = true);
-
-    try {
-      await createTestData();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Test data populated successfully')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to populate test data: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isResetting = false);
-      }
-    }
   }
 
   Widget _buildQuickLoginButton(String label, String email, Color color) {

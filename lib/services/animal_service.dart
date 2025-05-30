@@ -48,14 +48,14 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
       debugPrint('Loading animals...');
       state = const AsyncValue.loading();
       
-      // Check connectivity
       final connectivity = await Connectivity().checkConnectivity();
       List<Animal> animals;
       
       if (connectivity == ConnectivityResult.none) {
         // Load from local storage when offline
         debugPrint('📱 Offline mode: Loading animals from local storage');
-        animals = await _syncService.getAllLocalAnimals();
+        final animalBox = await Hive.openBox<Animal>('animals');
+        animals = animalBox.values.toList();
       } else {
         // Load from Upstash when online
         debugPrint('🌐 Online mode: Loading animals from Upstash');
@@ -65,6 +65,9 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
         for (final animal in animals) {
           await _syncService.saveAnimalLocally(animal);
         }
+
+        // Sync any pending changes
+        await _syncService.syncPending();
       }
       
       debugPrint('Loaded ${animals.length} animals');
@@ -140,10 +143,17 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
   }
 
   Future<List<Animal>> getAnimals() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) {
+      // Offline: Load from Hive
+      final animalBox = await Hive.openBox<Animal>('animals');
+      return animalBox.values.toList();
+    }
+    // Online: Load from Upstash as before
     try {
       debugPrint('Getting all animals');
       final keys = await UpstashConfig.redis.keys('animal:*');
-      debugPrint('Found ${keys.length} animal keys');
+      debugPrint('Found [32m${keys.length}[0m animal keys');
       final animals = <Animal>[];
 
       for (final key in keys) {
@@ -421,11 +431,11 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
         final images = await Future.wait(
           imageKeys.map((key) => UpstashConfig.redis.hgetall(key)).toList(),
         );
-        animal.images = images
+        final animalImages = images
             .where((img) => img != null && img.isNotEmpty)
             .map((img) => AnimalImage.fromJson(img!))
             .toList();
-        return animal;
+        return animal.copyWith(images: animalImages);
       } else {
         // Offline: Fetch from local storage (Hive)
         final animalBox = await Hive.openBox<Animal>('animals');

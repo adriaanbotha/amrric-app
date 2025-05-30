@@ -7,7 +7,10 @@ part 'animal.freezed.dart';
 part 'animal.g.dart';
 
 @freezed
+@JsonSerializable()
 class Animal with _$Animal {
+  const Animal._();
+
   const factory Animal({
     required String id,
     String? name,
@@ -18,8 +21,8 @@ class Animal with _$Animal {
     @JsonKey(fromJson: _parseEstimatedAge) int? estimatedAge,
     @JsonKey(fromJson: _parseWeight) double? weight,
     String? microchipNumber,
-    required DateTime registrationDate,
-    required DateTime lastUpdated,
+    @JsonKey(fromJson: _parseRequiredDateTime) required DateTime registrationDate,
+    @JsonKey(fromJson: _parseRequiredDateTime) required DateTime lastUpdated,
     required bool isActive,
     required String houseId,
     required String locationId,
@@ -29,7 +32,7 @@ class Animal with _$Animal {
     Map<String, dynamic>? medicalHistory,
     Map<String, dynamic>? censusData,
     Map<String, dynamic>? metadata,
-    List<AnimalImage>? images,
+    @JsonKey(fromJson: _parseImages) List<AnimalImage>? images,
   }) = _Animal;
 
   factory Animal.fromJson(Map<String, dynamic> json) {
@@ -45,6 +48,8 @@ class Animal with _$Animal {
     }
     return _$AnimalFromJson(json);
   }
+
+  Map<String, dynamic> toJson() => _$AnimalToJson(this);
 }
 
 // Helper functions for JSON parsing
@@ -71,6 +76,46 @@ double? _parseWeight(dynamic value) {
       return double.tryParse(value);
     } catch (e) {
       debugPrint('Error parsing weight: $e');
+      return null;
+    }
+  }
+  return null;
+}
+
+DateTime _parseRequiredDateTime(dynamic value) {
+  if (value is DateTime) return value;
+  if (value is String) {
+    try {
+      return DateTime.parse(value);
+    } catch (e) {
+      debugPrint('Error parsing required DateTime: $e');
+      throw FormatException('Invalid DateTime format: $value');
+    }
+  }
+  throw FormatException('Invalid DateTime value: $value');
+}
+
+DateTime? _parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String) {
+    try {
+      return DateTime.parse(value);
+    } catch (e) {
+      debugPrint('Error parsing DateTime: $e');
+      return null;
+    }
+  }
+  return null;
+}
+
+List<AnimalImage>? _parseImages(dynamic value) {
+  if (value == null) return null;
+  if (value is List) {
+    try {
+      return value.map((e) => AnimalImage.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error parsing images: $e');
       return null;
     }
   }

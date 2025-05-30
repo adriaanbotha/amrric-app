@@ -38,14 +38,16 @@ class PhotoSyncService {
       if (connectivityResult != ConnectivityResult.none) {
         // If online, save to Upstash and remove local file and record
         final key = 'user:$userId:photo:$photoId';
+        print('[savePhoto] Saving photo to Upstash: userId=$userId, photoId=$photoId, key=$key, base64 length=${base64Data.length}');
         await _redis.set(key, jsonEncode(updatedPhotoData));
-        _logger.i('Saved photo to Upstash: $photoId');
+        print('[savePhoto] Saved photo to Upstash: $key');
         await _localBox.delete(photoId);
         if (await file.exists()) await file.delete();
       } else {
         _logger.w('Offline mode: Photo saved locally only');
       }
     } catch (e) {
+      print('[savePhoto] Error saving photo to Upstash: $e');
       _logger.e('Error saving photo: $e');
       rethrow;
     }
@@ -57,19 +59,20 @@ class PhotoSyncService {
     required String filePath,
   }) async {
     try {
+      print('[getPhoto] Checking local file: $filePath');
       final file = File(filePath);
       if (await file.exists()) {
-        // Local file exists, return photo data from local storage
+        print('[getPhoto] Local file exists: $filePath');
         final localData = _localBox.get(photoId);
         if (localData != null) {
+          print('[getPhoto] Returning local data for $photoId');
           return Map<String, dynamic>.from(localData);
         }
       }
 
-      // Check connectivity
       final connectivityResult = await _connectivity.checkConnectivity();
       if (connectivityResult != ConnectivityResult.none) {
-        // If online, try to get from Upstash
+        print('[getPhoto] Online, fetching from Upstash: user:$userId:photo:$photoId');
         final key = 'user:$userId:photo:$photoId';
         final upstashData = await _redis.get(key);
         Map<String, dynamic>? data;
@@ -81,22 +84,28 @@ class PhotoSyncService {
           data = null;
         }
         if (data != null) {
-          // If local file is missing, restore it from base64
+          print('[getPhoto] Got data from Upstash for $photoId');
           if (!await file.exists() && data['base64'] != null) {
             final bytes = base64Decode(data['base64']);
             await file.writeAsBytes(bytes);
+            print('[getPhoto] Wrote file to $filePath');
           }
-          // Update local storage with latest data
           await _localBox.put(photoId, data);
           return data;
+        } else {
+          print('[getPhoto] No data found in Upstash for $photoId');
         }
       }
 
-      // If offline or not found in Upstash, get from local storage
       final localData = _localBox.get(photoId);
-      if (localData == null) return null;
+      if (localData == null) {
+        print('[getPhoto] No local data for $photoId');
+        return null;
+      }
+      print('[getPhoto] Returning fallback local data for $photoId');
       return Map<String, dynamic>.from(localData);
     } catch (e) {
+      print('[getPhoto] Error: $e');
       _logger.e('Error getting photo: $e');
       rethrow;
     }
@@ -234,8 +243,9 @@ class PhotoSyncService {
           final updatedPhotoData = Map<String, dynamic>.from(photoData)
             ..['base64'] = base64Data;
           final key = 'user:$userId:photo:$photoId';
+          print('[syncPhotos] Saving photo to Upstash: userId=$userId, photoId=$photoId, key=$key, base64 length=${base64Data.length}');
           await _redis.set(key, jsonEncode(updatedPhotoData));
-          _logger.i('Synced photo to Upstash: $photoId');
+          print('[syncPhotos] Saved photo to Upstash: $key');
           await _localBox.delete(photoId);
           await file.delete();
         }
@@ -246,6 +256,7 @@ class PhotoSyncService {
       }
       _logger.i('Sync completed successfully');
     } catch (e) {
+      print('[syncPhotos] Error saving photo to Upstash: $e');
       _logger.e('Error syncing photos: $e');
       rethrow;
     }
