@@ -38,14 +38,24 @@ Future<void> createTestUsers() async {
   ];
 
   for (final user in users) {
-    await UpstashConfig.redis.set('user:${user['email']}', User(
+    final userObj = User(
       id: user['id'] as String,
       email: user['email'] as String,
       name: user['name'] as String,
       role: user['role'] as UserRole,
       lastLogin: user['lastLogin'] as DateTime,
       isActive: user['isActive'] as bool,
-    ).toJson());
+    );
+    final userData = userObj.toJson();
+    // Convert all values to strings for Redis, ensuring proper JSON encoding for lists
+    final redisData = userData.map((key, value) {
+      if (value is List) {
+        return MapEntry(key, value.toString());
+      } else {
+        return MapEntry(key, value?.toString() ?? '');
+      }
+    });
+    await UpstashConfig.redis.hset('user:${user['email']}', redisData);
     await UpstashConfig.redis.set('password:${user['email']}', user['email']);
   }
 

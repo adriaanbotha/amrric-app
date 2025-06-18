@@ -10,6 +10,7 @@ import 'package:amrric_app/screens/admin/council_management_screen.dart';
 import 'package:amrric_app/screens/profile_screen.dart';
 import 'package:amrric_app/screens/admin/location_management_screen.dart';
 import 'package:amrric_app/screens/admin/animal_management_screen.dart';
+import 'package:amrric_app/screens/census_data_screen.dart';
 import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -268,6 +269,17 @@ class HomeScreen extends ConsumerWidget {
         ),
         _buildMenuCard(
           context,
+          'Community Management',
+          Icons.location_on,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LocationManagementScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
           'Reports',
           Icons.assessment,
           () => Navigator.push(
@@ -276,25 +288,6 @@ class HomeScreen extends ConsumerWidget {
               builder: (context) => const ReportsScreen(),
             ),
           ),
-        ),
-        _buildMenuCard(
-          context,
-          'Animal Records',
-          Icons.pets,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AnimalManagementScreen(),
-            ),
-          ),
-        ),
-        _buildMenuCard(
-          context,
-          'Treatments',
-          Icons.medical_services,
-          () {
-            // TODO: Implement treatments
-          },
         ),
       ],
     );
@@ -358,9 +351,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Census Data',
           Icons.people,
-          () {
-            // TODO: Implement census data
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CensusDataScreen(),
+            ),
+          ),
         ),
         _buildMenuCard(
           context,

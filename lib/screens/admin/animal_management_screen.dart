@@ -22,6 +22,106 @@ class AnimalManagementScreen extends ConsumerStatefulWidget {
 class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen> {
   String? selectedCouncil;
   String searchQuery = '';
+  List<Animal> _allAnimals = [];
+  List<Animal> _filteredAnimals = [];
+  bool _isLoading = true;
+  String? _error;
+  late final TextEditingController _searchController;
+  User? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: searchQuery);
+    _searchController.addListener(() {
+      if (_searchController.text != searchQuery) {
+        setState(() {
+          searchQuery = _searchController.text;
+          _applySearch();
+        });
+      }
+    });
+    _fetchUserAndAnimals();
+  }
+
+  Future<void> _fetchUserAndAnimals() async {
+    final authService = ref.read(authServiceProvider);
+    final user = await authService.getCurrentUser();
+    setState(() {
+      _user = user;
+    });
+    await _loadAnimals();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAnimals() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final animalService = ref.read(animalsProvider.notifier);
+      final user = _user;
+      if (user == null) {
+        setState(() {
+          _allAnimals = [];
+          _filteredAnimals = [];
+          _isLoading = false;
+        });
+        return;
+      }
+      List<Animal> animals;
+      switch (user.role) {
+        case UserRole.systemAdmin:
+          animals = await animalService.getAnimals();
+          break;
+        case UserRole.municipalityAdmin:
+          animals = await animalService.getAnimalsByCouncil(user.councilId);
+          break;
+        case UserRole.veterinaryUser:
+          animals = await animalService.getAnimalsWithMedicalFocus();
+          break;
+        case UserRole.censusUser:
+          animals = await animalService.getAnimalsByBasicInfo();
+          break;
+        default:
+          animals = [];
+      }
+      setState(() {
+        _allAnimals = animals;
+        _applySearch();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _applySearch() {
+    final query = searchQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      _filteredAnimals = List.from(_allAnimals);
+    } else {
+      _filteredAnimals = _allAnimals.where((animal) {
+        final name = animal.name?.toLowerCase() ?? '';
+        final species = animal.species.toLowerCase();
+        final breed = animal.breed?.toLowerCase() ?? '';
+        final id = animal.id.toLowerCase();
+        return name.contains(query) ||
+            species.contains(query) ||
+            breed.contains(query) ||
+            id.contains(query);
+      }).toList();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +131,7 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _showAddAnimalDialog()
+            onPressed: () => _showAddAnimalDialog(),
           ),
         ],
       ),
@@ -41,221 +141,143 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
 
   Widget _buildContent() {
     final authService = ref.watch(authServiceProvider);
-    return FutureBuilder<User?>(
-      future: authService.getCurrentUser(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final user = snapshot.data;
-        final permissions = AnimalPermissions(authService);
-        if (user == null) {
-          return const Center(
-            child: Text('Please log in to access animal management'),
-          );
-        }
-        return SafeArea(
-          child: Column(
-            children: [
-              // Search Bar
-              Padding(
+    final user = _user;
+    final permissions = AnimalPermissions(authService);
+    if (user == null) {
+      return const Center(
+        child: Text('Please log in to access animal management'),
+      );
+    }
+    return SafeArea(
+      child: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Card(
+              child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: TextField(
-                      decoration: const InputDecoration(
-                        hintText: 'Search animals...',
-                        prefixIcon: Icon(Icons.search),
-                        border: InputBorder.none,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          searchQuery = value;
-                        });
-                      },
-                    ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search animals...',
+                    prefixIcon: Icon(Icons.search),
+                    border: InputBorder.none,
                   ),
                 ),
               ),
-
-              // Main Content
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    setState(() {});
-                  },
-                  child: FutureBuilder<List<Animal>>(
-                    future: _getAnimalsList(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error: ${snapshot.error}',
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () => setState(() {}),
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      final animals = snapshot.data ?? [];
-
-                      if (animals.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.pets,
-                                size: 48,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'No animals found',
-                                style: TextStyle(
-                                  fontSize: 18,
+            ),
+          ),
+          // Main Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error: \\$_error',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadAnimals,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _filteredAnimals.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.pets,
+                                  size: 48,
                                   color: Colors.grey,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              FutureBuilder<bool>(
-                                future: permissions.canAddAnimal(),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'No animals found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                FutureBuilder<bool>(
+                                  future: permissions.canAddAnimal(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    if (snapshot.data == true) {
+                                      return ElevatedButton.icon(
+                                        onPressed: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const AnimalFormScreen(),
+                                          ),
+                                        ).then((_) => _loadAnimals()),
+                                        icon: const Icon(Icons.add),
+                                        label: const Text('Add Animal'),
+                                      );
+                                    }
                                     return const SizedBox.shrink();
-                                  }
-                                  if (snapshot.data == true) {
-                                    return ElevatedButton.icon(
-                                      onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const AnimalFormScreen(),
-                                        ),
-                                      ).then((_) => setState(() {})),
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('Add Animal'),
+                                  },
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadAnimals,
+                            child: ListView.builder(
+                              itemCount: _filteredAnimals.length,
+                              itemBuilder: (context, index) {
+                                final animal = _filteredAnimals[index];
+                                return FutureBuilder<Map<String, bool>>(
+                                  future: Future.wait([
+                                    permissions.canEditAnimal(),
+                                    permissions.canDeleteAnimal(),
+                                    permissions.canViewMedicalHistory(),
+                                  ]).then((results) => {
+                                        'canEdit': results[0],
+                                        'canDelete': results[1],
+                                        'canViewMedical': results[2],
+                                      }),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return const Center(child: CircularProgressIndicator());
+                                    }
+                                    final perms = snapshot.data ?? {
+                                      'canEdit': false,
+                                      'canDelete': false,
+                                      'canViewMedical': false,
+                                    };
+                                    return _buildAnimalCard(
+                                      animal: animal,
+                                      canEdit: perms['canEdit']!,
+                                      canDelete: perms['canDelete']!,
+                                      canViewMedical: perms['canViewMedical']!,
                                     );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
-                            ],
+                                  },
+                                );
+                              },
+                            ),
                           ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        itemCount: animals.length,
-                        itemBuilder: (context, index) {
-                          final animal = animals[index];
-                          return FutureBuilder<Map<String, bool>>(
-                            future: Future.wait([
-                              permissions.canEditAnimal(),
-                              permissions.canDeleteAnimal(),
-                              permissions.canViewMedicalHistory(),
-                            ]).then((results) => {
-                              'canEdit': results[0],
-                              'canDelete': results[1],
-                              'canViewMedical': results[2],
-                            }),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                              final perms = snapshot.data ?? {
-                                'canEdit': false,
-                                'canDelete': false,
-                                'canViewMedical': false,
-                              };
-                              return _buildAnimalCard(
-                                animal: animal,
-                                canEdit: perms['canEdit']!,
-                                canDelete: perms['canDelete']!,
-                                canViewMedical: perms['canViewMedical']!,
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
           ),
-        );
-      },
+        ],
+      ),
     );
-  }
-
-  Future<List<Animal>> _getAnimalsList() async {
-    final animalService = ref.read(animalsProvider.notifier);
-    final authService = ref.read(authServiceProvider);
-    final user = await authService.getCurrentUser();
-    
-    if (user == null) {
-      return [];
-    }
-
-    try {
-      List<Animal> animals;
-      
-      switch (user.role) {
-        case UserRole.systemAdmin:
-          animals = await animalService.getAnimals();
-        case UserRole.municipalityAdmin:
-          animals = await animalService.getAnimalsByCouncil(user.councilId);
-        case UserRole.veterinaryUser:
-          animals = await animalService.getAnimalsWithMedicalFocus();
-        case UserRole.censusUser:
-          animals = await animalService.getAnimalsByBasicInfo();
-        default:
-          animals = [];
-      }
-      
-      // Filter animals based on search query
-      if (searchQuery.isNotEmpty) {
-        final query = searchQuery.toLowerCase();
-        return animals.where((animal) {
-          final name = animal.name?.toLowerCase() ?? '';
-          final species = animal.species.toLowerCase();
-          final breed = animal.breed?.toLowerCase() ?? '';
-          final id = animal.id.toLowerCase();
-          
-          return name.contains(query) || 
-                 species.contains(query) || 
-                 breed.contains(query) ||
-                 id.contains(query);
-        }).toList();
-      }
-      
-      return animals;
-    } catch (e) {
-      debugPrint('Error getting animals: $e');
-      return [];
-    }
   }
 
   Widget _buildAnimalCard({
@@ -485,7 +507,11 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
       MaterialPageRoute(
         builder: (context) => AnimalFormScreen(animal: animal),
       ),
-    );
+    ).then((result) {
+      if (result == true) {
+        _loadAnimals();
+      }
+    });
   }
 
   Future<void> _deleteAnimal(Animal animal) async {
@@ -501,7 +527,7 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Animal'),
-        content: Text('Are you sure you want to delete ${animal.name ?? 'this animal'}?'),
+        content: Text('Are you sure you want to delete \\${animal.name ?? 'this animal'}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -522,12 +548,12 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Animal deleted successfully')),
           );
-          setState(() {});
+          _loadAnimals();
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting animal: $e')),
+            SnackBar(content: Text('Error deleting animal: \\$e')),
           );
         }
       }
@@ -542,9 +568,7 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
       ),
     );
     if (result == true) {
-      // Reload animals after adding
-      await ref.read(animalsProvider.notifier).loadAnimals();
-      setState(() {});
+      _loadAnimals();
     }
   }
 } 

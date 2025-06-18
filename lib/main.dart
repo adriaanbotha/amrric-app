@@ -158,8 +158,16 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
       theme: AmrricTheme.theme,
       routes: {
         '/login': (context) => LoginScreen(),
-        '/animals': (context) => AnimalManagementScreen(),
-        '/medications': (context) => MedicationScreen(),
+        '/animals': (context) => RoleGuard(
+          allowedRoles: [UserRole.systemAdmin, UserRole.veterinaryUser, UserRole.censusUser],
+          routeName: '/animals',
+          child: AnimalManagementScreen(),
+        ),
+        '/medications': (context) => RoleGuard(
+          allowedRoles: [UserRole.systemAdmin, UserRole.veterinaryUser],
+          routeName: '/medications',
+          child: MedicationScreen(),
+        ),
         '/reports': (context) => ReportsScreen(),
         '/settings': (context) => SettingsScreen(),
       },
@@ -202,5 +210,57 @@ class ErrorApp extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Role-based route guard
+class RoleGuard extends ConsumerWidget {
+  final Widget child;
+  final List<UserRole> allowedRoles;
+  final String routeName;
+
+  const RoleGuard({
+    super.key,
+    required this.child,
+    required this.allowedRoles,
+    required this.routeName,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    
+    if (authState == null) {
+      // User not logged in, redirect to login
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!allowedRoles.contains(authState.role)) {
+      // User doesn't have permission, show access denied
+      return Scaffold(
+        appBar: AppBar(title: const Text('Access Denied')),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.block, size: 64, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                'You do not have permission to access this page.',
+                style: TextStyle(fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return child;
   }
 }
