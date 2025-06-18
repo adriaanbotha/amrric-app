@@ -58,9 +58,17 @@ Future<void> createTestData() async {
     await createTestLocations();
     debugPrint('Created test locations');
     
+    // Create test houses
+    await createTestHouses();
+    debugPrint('Created test houses');
+    
     // Create test animals
     await createTestAnimals();
     debugPrint('Created test animals');
+    
+    // Create test census animals
+    await createTestCensusAnimals();
+    debugPrint('Created test census animals');
     
     // Create test reports
     await createTestReports();
@@ -252,6 +260,8 @@ Future<void> createTestUsers() async {
           'details': 'Test account created',
         }
       ],
+      locationId: 'location_nt_001', // Assign Darwin CBD as test location
+      councilId: 'council_nt_001', // Darwin City Council
       createdAt: now,
       updatedAt: now,
     ),
@@ -2051,28 +2061,287 @@ Future<void> createTestLocations() async {
   }
 }
 
+Future<void> createTestHouses() async {
+  try {
+    final redis = UpstashConfig.redis;
+    debugPrint('Creating test houses...');
+
+    // First, clear any existing house data
+    final existingKeys = await redis.keys('house:*');
+    if (existingKeys.isNotEmpty) {
+      await redis.del(existingKeys);
+    }
+    await redis.del(['houses']);
+
+    final houses = [
+      // Houses in Darwin CBD (location_nt_001) for census user
+      {
+        'id': 'house_darwin_001',
+        'address': '123 Mitchell Street',
+        'lotNumber': '',
+        'ownerName': 'John Smith',
+        'ownerContact': '0412345678',
+        'locationId': 'location_nt_001',
+        'councilId': 'council_nt_001',
+        'gpsCoordinates': '-12.4634, 130.8456',
+        'animalCount': '2',
+        'notes': 'Two dogs, friendly owners',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'house_darwin_002',
+        'address': '45 Smith Street',
+        'lotNumber': '',
+        'ownerName': 'Mary Johnson',
+        'ownerContact': 'mary.j@email.com',
+        'locationId': 'location_nt_001',
+        'councilId': 'council_nt_001',
+        'gpsCoordinates': '-12.4612, 130.8423',
+        'animalCount': '1',
+        'notes': 'One cat, indoor only',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'house_darwin_003',
+        'address': '78 Knuckey Street',
+        'lotNumber': '',
+        'ownerName': 'David Wilson',
+        'ownerContact': '0423456789',
+        'locationId': 'location_nt_001',
+        'councilId': 'council_nt_001',
+        'gpsCoordinates': '-12.4598, 130.8401',
+        'animalCount': '3',
+        'notes': 'Two cats and one dog',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'house_darwin_004',
+        'address': '12 Cavenagh Street',
+        'lotNumber': '',
+        'ownerName': 'Sarah Brown',
+        'ownerContact': 'sarah.brown@email.com',
+        'locationId': 'location_nt_001',
+        'councilId': 'council_nt_001',
+        'gpsCoordinates': '-12.4587, 130.8434',
+        'animalCount': '1',
+        'notes': 'One elderly dog',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'house_darwin_005',
+        'address': '34 Bennett Street',
+        'lotNumber': '',
+        'ownerName': 'Michael Davis',
+        'ownerContact': '0434567890',
+        'locationId': 'location_nt_001',
+        'councilId': 'council_nt_001',
+        'gpsCoordinates': '-12.4623, 130.8467',
+        'animalCount': '0',
+        'notes': 'No pets currently',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    ];
+
+    for (final house in houses) {
+      try {
+        final houseKey = 'house:${house['id']}';
+        
+        // Convert all values to strings for Redis
+        final redisData = house.map((key, value) {
+          if (value == null) {
+            return MapEntry(key, '');
+          } else if (value is bool) {
+            return MapEntry(key, value.toString());
+          } else if (value is List || value is Map) {
+            return MapEntry(key, jsonEncode(value));
+          } else {
+            return MapEntry(key, value.toString());
+          }
+        });
+        
+        await redis.hset(houseKey, redisData);
+        await redis.sadd('houses', [house['id']]);
+        
+        debugPrint('House ${house['address']} created successfully');
+      } catch (e) {
+        debugPrint('Error creating house ${house['address']}: $e');
+        rethrow;
+      }
+    }
+
+    debugPrint('All test houses created successfully');
+  } catch (e) {
+    debugPrint('Error creating test houses: $e');
+    rethrow;
+  }
+}
+
 Future<void> createTestCensusAnimals() async {
   final redis = UpstashConfig.redis;
   final now = DateTime.now();
-  final List<Map<String, dynamic>> censusTestData = List.generate(19, (i) => {
-    'id': 'census_animal_${i+1}',
-    'species': i % 2 == 0 ? 'Dog' : 'Cat',
-    'sex': i % 3 == 0 ? 'Male' : 'Female',
-    'estimatedAge': (i % 10) + 1,
-    'color': i % 2 == 0 ? 'Brown' : 'Black',
-    'houseId': 'house_${(i % 5) + 1}',
-    'locationId': 'location_${(i % 3) + 1}',
-    'councilId': 'council_1',
-    'isActive': true,
-    'registrationDate': now.subtract(Duration(days: i * 2)).toIso8601String(),
-    'lastUpdated': now.toIso8601String(),
-    'photoUrls': <String>[],
-    'censusData': {
-      'lastCount': now.subtract(Duration(days: i * 2)).toIso8601String(),
-      'condition': i % 4 == 0 ? 'healthy' : 'needs attention',
-      'location': 'house_${(i % 5) + 1}',
+  
+  // Create animals specifically for Darwin CBD (location_nt_001)
+  final List<Map<String, dynamic>> censusTestData = [
+    {
+      'id': 'census_animal_darwin_001',
+      'name': 'Rex',
+      'species': 'Dog',
+      'breed': 'German Shepherd',
+      'color': 'Black and Tan',
+      'sex': 'Male',
+      'estimatedAge': 4,
+      'weight': 32.5,
+      'houseId': 'house_darwin_001',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 30)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 10)).toIso8601String(),
+        'condition': 'healthy',
+        'location': 'house_darwin_001',
+      },
     },
-  });
+    {
+      'id': 'census_animal_darwin_002',
+      'name': 'Bella',
+      'species': 'Dog',
+      'breed': 'Labrador',
+      'color': 'Golden',
+      'sex': 'Female',
+      'estimatedAge': 2,
+      'weight': 25.0,
+      'houseId': 'house_darwin_001',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 45)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 10)).toIso8601String(),
+        'condition': 'healthy',
+        'location': 'house_darwin_001',
+      },
+    },
+    {
+      'id': 'census_animal_darwin_003',
+      'name': 'Whiskers',
+      'species': 'Cat',
+      'breed': 'Domestic Shorthair',
+      'color': 'Tabby',
+      'sex': 'Male',
+      'estimatedAge': 3,
+      'weight': 4.5,
+      'houseId': 'house_darwin_002',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 60)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 15)).toIso8601String(),
+        'condition': 'healthy',
+        'location': 'house_darwin_002',
+      },
+    },
+    {
+      'id': 'census_animal_darwin_004',
+      'name': 'Fluffy',
+      'species': 'Cat',
+      'breed': 'Persian',
+      'color': 'White',
+      'sex': 'Female',
+      'estimatedAge': 5,
+      'weight': 3.8,
+      'houseId': 'house_darwin_003',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 90)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 20)).toIso8601String(),
+        'condition': 'needs attention',
+        'location': 'house_darwin_003',
+      },
+    },
+    {
+      'id': 'census_animal_darwin_005',
+      'name': 'Shadow',
+      'species': 'Cat',
+      'breed': 'Domestic Shorthair',
+      'color': 'Black',
+      'sex': 'Male',
+      'estimatedAge': 1,
+      'weight': 3.2,
+      'houseId': 'house_darwin_003',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 15)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 5)).toIso8601String(),
+        'condition': 'healthy',
+        'location': 'house_darwin_003',
+      },
+    },
+    {
+      'id': 'census_animal_darwin_006',
+      'name': 'Max',
+      'species': 'Dog',
+      'breed': 'Beagle',
+      'color': 'Tricolor',
+      'sex': 'Male',
+      'estimatedAge': 6,
+      'weight': 15.0,
+      'houseId': 'house_darwin_003',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 120)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 8)).toIso8601String(),
+        'condition': 'healthy',
+        'location': 'house_darwin_003',
+      },
+    },
+    {
+      'id': 'census_animal_darwin_007',
+      'name': 'Buddy',
+      'species': 'Dog',
+      'breed': 'Border Collie',
+      'color': 'Black and White',
+      'sex': 'Male',
+      'estimatedAge': 8,
+      'weight': 22.0,
+      'houseId': 'house_darwin_004',
+      'locationId': 'location_nt_001',
+      'councilId': 'council_nt_001',
+      'isActive': true,
+      'registrationDate': now.subtract(Duration(days: 180)).toIso8601String(),
+      'lastUpdated': now.toIso8601String(),
+      'photoUrls': <String>[],
+      'censusData': {
+        'lastCount': now.subtract(Duration(days: 12)).toIso8601String(),
+        'condition': 'needs attention',
+        'location': 'house_darwin_004',
+      },
+    },
+  ];
 
   for (final animal in censusTestData) {
     final key = 'animal:${animal['id']}';

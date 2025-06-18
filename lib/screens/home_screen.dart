@@ -11,6 +11,7 @@ import 'package:amrric_app/screens/profile_screen.dart';
 import 'package:amrric_app/screens/admin/location_management_screen.dart';
 import 'package:amrric_app/screens/admin/animal_management_screen.dart';
 import 'package:amrric_app/screens/census_data_screen.dart';
+import 'package:amrric_app/screens/census_location_data_screen.dart';
 import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -66,19 +67,6 @@ class HomeScreen extends ConsumerWidget {
             const Divider(),
             // Admin Section
             if (user.role == UserRole.systemAdmin) ...[
-              ListTile(
-                leading: const Icon(Icons.pets),
-                title: const Text('Animal Management'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AnimalManagementScreen(),
-                    ),
-                  );
-                },
-              ),
               ListTile(
                 leading: const Icon(Icons.admin_panel_settings),
                 title: const Text('User Management'),
@@ -192,17 +180,6 @@ class HomeScreen extends ConsumerWidget {
       crossAxisCount: 2,
       padding: const EdgeInsets.all(16),
       children: [
-        _buildMenuCard(
-          context,
-          'Animal Management',
-          Icons.pets,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AnimalManagementScreen(),
-            ),
-          ),
-        ),
         _buildMenuCard(
           context,
           'User Management',
@@ -384,9 +361,12 @@ class HomeScreen extends ConsumerWidget {
           context,
           'Location Data',
           Icons.location_on,
-          () {
-            // TODO: Implement location data
-          },
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CensusLocationDataScreen(),
+            ),
+          ),
         ),
       ],
     );

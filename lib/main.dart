@@ -159,12 +159,12 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
       routes: {
         '/login': (context) => LoginScreen(),
         '/animals': (context) => RoleGuard(
-          allowedRoles: [UserRole.systemAdmin, UserRole.veterinaryUser, UserRole.censusUser],
+          allowedRoles: [UserRole.veterinaryUser, UserRole.censusUser],
           routeName: '/animals',
           child: AnimalManagementScreen(),
         ),
         '/medications': (context) => RoleGuard(
-          allowedRoles: [UserRole.systemAdmin, UserRole.veterinaryUser],
+          allowedRoles: [UserRole.veterinaryUser],
           routeName: '/medications',
           child: MedicationScreen(),
         ),

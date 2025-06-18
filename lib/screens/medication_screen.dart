@@ -66,6 +66,9 @@ class _MedicationScreenState extends State<MedicationScreen> {
         appBar: AppBar(
           title: const Text('Medication Management'),
           bottom: const TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
             tabs: [
               Tab(text: 'Current Medications'),
               Tab(text: 'Medication History'),
