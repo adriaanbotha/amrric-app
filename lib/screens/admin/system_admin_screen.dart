@@ -12,7 +12,14 @@ class _SystemAdminScreenState extends State<SystemAdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ... (existing code)
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('System Administration'),
+      ),
+      body: const Center(
+        child: Text('System Administration Dashboard'),
+      ),
+    );
   }
 
   Widget _buildActivityLog(List<Map<String, dynamic>> activityLog) {

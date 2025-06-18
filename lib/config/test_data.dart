@@ -1181,6 +1181,23 @@ Future<void> createTestAnimals() async {
 Future<void> createTestReports() async {
   try {
     final redis = UpstashConfig.redis;
+    final now = DateTime.now();
+    final pastWeek = now.subtract(const Duration(days: 7));
+    final nextWeek = now.add(const Duration(days: 7));
+    
+    // Clear existing reports
+    final existingKeys = await redis.keys('reports:*');
+    if (existingKeys.isNotEmpty) {
+      await redis.del(existingKeys);
+    }
+    
+    // Generate report data for each user role
+    await _createSystemAdminReports(redis, pastWeek, nextWeek);
+    await _createMunicipalityAdminReports(redis, pastWeek, nextWeek);
+    await _createVeterinaryUserReports(redis, pastWeek, nextWeek);
+    await _createCensusUserReports(redis, pastWeek, nextWeek);
+    
+    // Legacy reports for backwards compatibility
     final reports = [
       {
         'id': 'report_001',
@@ -2356,4 +2373,230 @@ Future<void> createTestCensusAnimals() async {
     await redis.sadd('animals', [animal['id']]);
   }
   debugPrint('Test census animal records created successfully');
-} 
+}
+
+// Helper functions for creating role-specific reports
+Future<void> _createSystemAdminReports(dynamic redis, DateTime startDate, DateTime endDate) async {
+  // User Activity Report
+  final userActivityData = List.generate(20, (i) => {
+    'timestamp': startDate.add(Duration(hours: i * 8)).toIso8601String(),
+    'action': ['login_success', 'logout', 'data_export', 'user_created', 'settings_changed'][i % 5],
+    'userId': 'user_${i % 4 + 1}',
+    'userEmail': ['admin@amrric.com', 'municipal@amrric.com', 'vet@amrric.com', 'census@amrric.com'][i % 4],
+    'userName': ['System Admin', 'Municipality Admin', 'Veterinary User', 'Census User'][i % 4],
+    'userRole': ['systemAdmin', 'municipalityAdmin', 'veterinaryUser', 'censusUser'][i % 4],
+    'details': 'Generated test activity',
+    'ipAddress': '192.168.1.${i % 254 + 1}',
+    'sessionId': 'session_${i}',
+  });
+  await redis.set('reports:systemAdmin:User Activity', jsonEncode(userActivityData));
+
+  // System Usage Report
+  final systemUsageData = List.generate(15, (i) => {
+    'timestamp': startDate.add(Duration(hours: i * 12)).toIso8601String(),
+    'action': ['login_success', 'logout'][i % 2],
+    'userId': 'user_${i % 4 + 1}',
+    'userEmail': ['admin@amrric.com', 'municipal@amrric.com', 'vet@amrric.com', 'census@amrric.com'][i % 4],
+    'userName': ['System Admin', 'Municipality Admin', 'Veterinary User', 'Census User'][i % 4],
+    'userRole': ['systemAdmin', 'municipalityAdmin', 'veterinaryUser', 'censusUser'][i % 4],
+    'sessionDuration': i % 2 == 1 ? (30 + i * 5) : null,
+    'sessionStartTime': i % 2 == 0 ? startDate.add(Duration(hours: i * 12)).toIso8601String() : null,
+  });
+  await redis.set('reports:systemAdmin:System Usage', jsonEncode(systemUsageData));
+
+  // Data Retention Report
+  final dataRetentionData = List.generate(10, (i) => {
+    'dataType': ['Activity Log', 'User Profile', 'Animal Record', 'Treatment Record'][i % 4],
+    'recordId': 'record_${i + 1}',
+    'userId': 'user_${i % 4 + 1}',
+    'userEmail': ['admin@amrric.com', 'municipal@amrric.com', 'vet@amrric.com', 'census@amrric.com'][i % 4],
+    'timestamp': startDate.subtract(Duration(days: i * 30)).toIso8601String(),
+    'ageInDays': i * 30,
+    'dataSize': 1024 + i * 512,
+    'retentionStatus': i > 12 ? 'Review Required' : 'Within Policy',
+    'lastModified': startDate.subtract(Duration(days: i * 15)).toIso8601String(),
+  });
+  await redis.set('reports:systemAdmin:Data Retention', jsonEncode(dataRetentionData));
+
+  // Audit Log Report
+  final auditLogData = List.generate(25, (i) => {
+    'timestamp': startDate.add(Duration(hours: i * 6)).toIso8601String(),
+    'action': ['user_login', 'data_access', 'settings_change', 'report_generated', 'data_export'][i % 5],
+    'userId': 'user_${i % 4 + 1}',
+    'userEmail': ['admin@amrric.com', 'municipal@amrric.com', 'vet@amrric.com', 'census@amrric.com'][i % 4],
+    'resource': ['users', 'animals', 'reports', 'settings', 'councils'][i % 5],
+    'result': ['success', 'failed'][i % 10 == 0 ? 1 : 0],
+    'ipAddress': '192.168.1.${i % 254 + 1}',
+    'details': 'Test audit entry ${i + 1}',
+  });
+  await redis.set('reports:systemAdmin:Audit Log', jsonEncode(auditLogData));
+}
+
+Future<void> _createMunicipalityAdminReports(dynamic redis, DateTime startDate, DateTime endDate) async {
+  // Municipality Overview Report
+  final municipalityData = List.generate(7, (i) => {
+    'date': startDate.add(Duration(days: i)).toIso8601String(),
+    'totalAnimals': 45 + i * 2,
+    'newRegistrations': i + 1,
+    'activeIncidents': 2 + (i % 3),
+    'completedTreatments': 5 + i,
+    'councilId': 'council_nt_001',
+    'locationId': 'location_nt_001',
+    'staffActivity': 8 + (i % 4),
+  });
+  await redis.set('reports:municipalityAdmin:Municipality Overview', jsonEncode(municipalityData));
+
+  // Animal Population Report
+  final animalPopulationData = List.generate(7, (i) => {
+    'date': startDate.add(Duration(days: i)).toIso8601String(),
+    'species': ['Dog', 'Cat'][i % 2],
+    'count': 20 + i * 3,
+    'location': 'Darwin CBD',
+    'status': 'active',
+    'vaccinated': 18 + i * 2,
+    'microchipped': 19 + i * 3,
+  });
+  await redis.set('reports:municipalityAdmin:Animal Population', jsonEncode(animalPopulationData));
+
+  // Treatment Statistics Report
+  final treatmentStatsData = List.generate(10, (i) => {
+    'date': startDate.add(Duration(days: i)).toIso8601String(),
+    'treatmentType': ['Vaccination', 'Dental', 'Surgery', 'Medication', 'Checkup'][i % 5],
+    'count': 3 + (i % 5),
+    'species': ['Dog', 'Cat'][i % 2],
+    'status': ['completed', 'pending'][i % 8 == 0 ? 1 : 0],
+    'cost': 100.0 + i * 25,
+    'veterinarian': 'vet@amrric.com',
+  });
+  await redis.set('reports:municipalityAdmin:Treatment Statistics', jsonEncode(treatmentStatsData));
+
+  // Census Data Report
+  final censusData = List.generate(5, (i) => {
+    'date': startDate.add(Duration(days: i * 2)).toIso8601String(),
+    'location': 'Darwin CBD',
+    'totalHouses': 25 + i,
+    'housesWithAnimals': 20 + i,
+    'totalAnimals': 47 + i * 3,
+    'dogs': 28 + i * 2,
+    'cats': 19 + i,
+    'healthyAnimals': 42 + i * 2,
+    'animalsNeedingAttention': 5 + (i % 3),
+  });
+  await redis.set('reports:municipalityAdmin:Census Data', jsonEncode(censusData));
+}
+
+Future<void> _createVeterinaryUserReports(dynamic redis, DateTime startDate, DateTime endDate) async {
+  // Treatment Records Report
+  final treatmentRecordsData = List.generate(15, (i) => {
+    'date': startDate.add(Duration(hours: i * 8)).toIso8601String(),
+    'animalId': 'animal_${i % 7 + 1}',
+    'animalName': ['Rex', 'Bella', 'Whiskers', 'Fluffy', 'Shadow', 'Max', 'Buddy'][i % 7],
+    'species': ['Dog', 'Cat'][i % 2],
+    'treatmentType': ['Vaccination', 'Dental Cleaning', 'Surgery', 'Medication', 'Health Check'][i % 5],
+    'status': ['completed', 'pending', 'scheduled'][i % 10 < 7 ? 0 : (i % 10 < 9 ? 1 : 2)],
+    'veterinarian': 'vet@amrric.com',
+    'cost': 75.0 + i * 15,
+    'notes': 'Treatment completed successfully',
+    'followUpRequired': i % 5 == 0,
+  });
+  await redis.set('reports:veterinaryUser:Treatment Records', jsonEncode(treatmentRecordsData));
+
+  // Animal Health Report
+  final animalHealthData = List.generate(12, (i) => {
+    'animalId': 'animal_${i % 7 + 1}',
+    'animalName': ['Rex', 'Bella', 'Whiskers', 'Fluffy', 'Shadow', 'Max', 'Buddy'][i % 7],
+    'species': ['Dog', 'Cat'][i % 2],
+    'lastCheckup': startDate.subtract(Duration(days: i * 5)).toIso8601String(),
+    'healthStatus': ['Excellent', 'Good', 'Fair', 'Poor'][i % 4],
+    'weight': 15.0 + i * 2.5,
+    'vaccinations': ['Up to date', 'Overdue'][i % 8 == 0 ? 1 : 0],
+    'conditions': i % 4 == 0 ? ['Dental disease'] : [],
+    'nextCheckup': endDate.add(Duration(days: i * 7)).toIso8601String(),
+  });
+  await redis.set('reports:veterinaryUser:Animal Health', jsonEncode(animalHealthData));
+
+  // Medication Usage Report
+  final medicationUsageData = List.generate(18, (i) => {
+    'date': startDate.add(Duration(days: i % 7)).toIso8601String(),
+    'medicationName': ['Heartworm Prevention', 'Flea Treatment', 'Antibiotics', 'Pain Relief', 'Vitamins'][i % 5],
+    'animalId': 'animal_${i % 7 + 1}',
+    'animalName': ['Rex', 'Bella', 'Whiskers', 'Fluffy', 'Shadow', 'Max', 'Buddy'][i % 7],
+    'dosage': '${i + 1}mg',
+    'frequency': ['Daily', 'Weekly', 'Monthly'][i % 3],
+    'startDate': startDate.add(Duration(days: i % 7)).toIso8601String(),
+    'endDate': startDate.add(Duration(days: (i % 7) + 14)).toIso8601String(),
+    'prescribedBy': 'vet@amrric.com',
+    'status': ['Active', 'Completed'][i % 6 == 0 ? 1 : 0],
+  });
+  await redis.set('reports:veterinaryUser:Medication Usage', jsonEncode(medicationUsageData));
+
+  // Veterinary Services Report
+  final vetServicesData = List.generate(8, (i) => {
+    'date': startDate.add(Duration(days: i)).toIso8601String(),
+    'serviceType': ['Consultation', 'Vaccination', 'Surgery', 'Emergency'][i % 4],
+    'count': 3 + (i % 5),
+    'totalCost': 300.0 + i * 50,
+    'averageDuration': 45 + i * 15,
+    'satisfaction': 4.5 - (i % 3) * 0.2,
+    'location': 'Darwin CBD',
+  });
+  await redis.set('reports:veterinaryUser:Veterinary Services', jsonEncode(vetServicesData));
+}
+
+Future<void> _createCensusUserReports(dynamic redis, DateTime startDate, DateTime endDate) async {
+  // Population Census Report
+  final populationCensusData = List.generate(7, (i) => {
+    'date': startDate.add(Duration(days: i)).toIso8601String(),
+    'location': 'Darwin CBD',
+    'totalAnimals': 47 + i * 2,
+    'species': ['Dog', 'Cat'][i % 2],
+    'count': i % 2 == 0 ? 28 + i : 19 + i,
+    'healthStatus': ['Healthy', 'Needs Attention'][i % 5 == 0 ? 1 : 0],
+    'microchipped': i % 2 == 0 ? 26 + i : 18 + i,
+    'vaccinated': i % 2 == 0 ? 25 + i : 17 + i,
+    'censusBy': 'census@amrric.com',
+  });
+  await redis.set('reports:censusUser:Population Census', jsonEncode(populationCensusData));
+
+  // Animal Distribution Report
+  final animalDistributionData = List.generate(10, (i) => {
+    'houseId': 'house_darwin_00${(i % 5) + 1}',
+    'address': ['123 Mitchell Street', '45 Smith Street', '78 Knuckey Street', '12 Cavenagh Street', '34 Bennett Street'][i % 5],
+    'animalCount': 1 + (i % 3),
+    'dogs': i % 3 == 0 ? 1 + (i % 2) : 0,
+    'cats': i % 3 != 0 ? 1 : 0,
+    'lastCensus': startDate.add(Duration(days: i % 7)).toIso8601String(),
+    'condition': ['Good', 'Needs Attention'][i % 8 == 0 ? 1 : 0],
+    'location': 'Darwin CBD',
+  });
+  await redis.set('reports:censusUser:Animal Distribution', jsonEncode(animalDistributionData));
+
+  // Breed Statistics Report
+  final breedStatsData = List.generate(12, (i) => {
+    'species': ['Dog', 'Cat'][i % 2],
+    'breed': i % 2 == 0 ? 
+      ['German Shepherd', 'Labrador', 'Beagle', 'Border Collie', 'Mixed Breed', 'Golden Retriever'][i % 6] :
+      ['Domestic Shorthair', 'Persian', 'Siamese', 'Maine Coon', 'British Shorthair', 'Ragdoll'][i % 6],
+    'count': 3 + (i % 5),
+    'averageAge': 3.5 + (i % 4),
+    'healthStatus': ['Excellent', 'Good', 'Fair'][i % 3],
+    'location': 'Darwin CBD',
+    'lastUpdated': startDate.add(Duration(days: i % 7)).toIso8601String(),
+  });
+  await redis.set('reports:censusUser:Breed Statistics', jsonEncode(breedStatsData));
+
+  // Location Data Report
+  final locationData = List.generate(5, (i) => {
+    'date': startDate.add(Duration(days: i)).toIso8601String(),
+    'location': 'Darwin CBD',
+    'totalHouses': 25 + i,
+    'housesVisited': 20 + i,
+    'housesWithAnimals': 18 + i,
+    'animalsFound': 45 + i * 3,
+    'newAnimals': 2 + (i % 3),
+    'healthChecks': 40 + i * 2,
+    'vaccinationsNeeded': 5 + (i % 4),
+    'censusProgress': ((20 + i) / (25 + i) * 100).round(),
+  });
+  await redis.set('reports:censusUser:Location Data', jsonEncode(locationData));
+}
