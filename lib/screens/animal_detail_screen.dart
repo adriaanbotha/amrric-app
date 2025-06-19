@@ -233,7 +233,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   }
 
   Future<void> _updateAnimalField(String field, dynamic value) async {
-    if (_animal == null) return;
+    if (_animal == null || !mounted) return;
     
     try {
       debugPrint('🔄 Updating animal field: $field = $value');
@@ -243,21 +243,24 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
         breed: field == 'breed' ? value as String? : _animal!.breed,
         color: field == 'color' ? value as String? : _animal!.color,
         estimatedAge: field == 'estimatedAge' ? value as int? : _animal!.estimatedAge,
+        weight: field == 'weight' ? value as double? : _animal!.weight,
         lastUpdated: DateTime.now(),
       );
       
-      // Update in database
+      // Update local state first for immediate UI response
+      if (mounted) {
+        setState(() {
+          _animal = updatedAnimal;
+        });
+      }
+      
+      // Then update in database
       final animalService = ref.read(animalsProvider.notifier);
       await animalService.updateAnimal(updatedAnimal);
       
-      // Update local state
-      setState(() {
-        _animal = updatedAnimal;
-      });
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$field updated successfully')),
+          SnackBar(content: Text('${field.replaceAll('_', ' ')} updated successfully')),
         );
       }
       
@@ -266,7 +269,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
       debugPrint('❌ Error updating animal field: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating $field: $e')),
+          SnackBar(content: Text('Error updating ${field.replaceAll('_', ' ')}: $e')),
         );
       }
     }
@@ -352,43 +355,88 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Status row with icon
                       Row(
                         children: [
                           Icon(
-                            _animal!.species.toLowerCase() == 'dog' ? Icons.pets : Icons.pets,
-                            color: Theme.of(context).primaryColor,
+                            Icons.health_and_safety,
+                            color: Colors.green,
+                            size: 20,
                           ),
                           const SizedBox(width: 8),
+                          const Text('Alive', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
+                          const Spacer(),
                           Text(
-                            '${_animal!.species} • ${_animal!.sex}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            _formatDate(_animal!.registrationDate),
+                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
+                      
+                      // Name (large display)
+                      Text(
+                        _animal!.name ?? widget.animalName,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Owner field
+                      _buildInfoRow('Owner', _animal!.ownerId ?? '', null),
+                      const SizedBox(height: 8),
+                      
+                      // Gender with icon
+                      _buildInfoRow('Gender', _animal!.sex, Icons.pets),
+                      const SizedBox(height: 8),
+                      
+                      // Breed (editable)
                       _buildEditableField(
                         'Breed',
                         _animal!.breed ?? '',
                         (value) => _updateAnimalField('breed', value),
                       ),
                       const SizedBox(height: 8),
+                      
+                      // Repro status
+                      _buildInfoRow('Repro', 'Unknown', Icons.help_outline),
+                      const SizedBox(height: 8),
+                      
+                      // Age (editable)
                       _buildEditableField(
-                        'Color',
+                        'Age',
+                        _getAgeDisplay(),
+                        (value) => _updateAnimalField('estimatedAge', int.tryParse(value) ?? 0),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Size
+                      _buildInfoRow('Size', 'Unknown', null),
+                      const SizedBox(height: 8),
+                      
+                      // Weight (editable)
+                      _buildEditableField(
+                        'Weight(kg)',
+                        _animal!.weight?.toString() ?? '',
+                        (value) => _updateAnimalField('weight', double.tryParse(value) ?? 0.0),
+                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Microchip
+                      _buildInfoRow('MC', _animal!.microchipNumber ?? '', Icons.qr_code),
+                      const SizedBox(height: 8),
+                      
+                      // Registration
+                      _buildInfoRow('Registration', _formatDate(_animal!.registrationDate), null),
+                      const SizedBox(height: 8),
+                      
+                      // Colour (editable)
+                      _buildEditableField(
+                        'Colour',
                         _animal!.color ?? '',
                         (value) => _updateAnimalField('color', value),
                       ),
-                      const SizedBox(height: 8),
-                      _buildEditableField(
-                        'Age',
-                        _animal!.estimatedAge?.toString() ?? '0',
-                        (value) => _updateAnimalField('estimatedAge', int.tryParse(value) ?? 0),
-                        suffix: ' years',
-                        keyboardType: TextInputType.number,
-                      ),
-                      if (_animal!.weight != null) ...[
-                        const SizedBox(height: 8),
-                        Text('Weight: ${_animal!.weight}kg'),
-                      ],
                     ],
                   ),
                 ),
@@ -648,6 +696,37 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     } catch (e) {
       return timestamp;
     }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _getAgeDisplay() {
+    if (_animal!.estimatedAge == null) {
+      return 'Unknown';
+    } else {
+      return '${_animal!.estimatedAge} years';
+    }
+  }
+
+  Widget _buildInfoRow(String label, String value, IconData? icon) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(
+            icon,
+            color: Colors.grey,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          '$label: $value',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
   }
 }
 
