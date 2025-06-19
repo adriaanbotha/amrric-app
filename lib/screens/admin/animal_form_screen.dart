@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/models/animal.dart';
+import 'package:amrric_app/models/house.dart';
 import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/utils/permission_helper.dart';
@@ -9,6 +11,8 @@ import 'package:amrric_app/widgets/animal_photo_gallery.dart';
 import 'package:amrric_app/services/photo_sync_service.dart';
 import 'package:amrric_app/services/location_service.dart';
 import 'package:amrric_app/services/council_service.dart';
+import 'package:amrric_app/services/house_service.dart';
+import 'package:amrric_app/providers/house_provider.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -16,8 +20,13 @@ import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class AnimalFormScreen extends ConsumerStatefulWidget {
   final Animal? animal;
+  final House? preselectedHouse;
 
-  const AnimalFormScreen({super.key, this.animal});
+  const AnimalFormScreen({
+    super.key, 
+    this.animal,
+    this.preselectedHouse,
+  });
 
   @override
   ConsumerState<AnimalFormScreen> createState() => _AnimalFormScreenState();
@@ -37,6 +46,9 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
   PhotoSyncService? _photoSyncService;
   bool _photoSyncServiceReady = false;
   List<String> _photoUrls = [];
+  String? _selectedHouseId;
+  List<House> _houses = [];
+  bool _isLoadingHouses = true;
 
   @override
   void initState() {
@@ -51,7 +63,12 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
     _estimatedAge = widget.animal?.estimatedAge ?? 0;
     _isActive = widget.animal?.isActive ?? true;
     _photoUrls = List<String>.from(widget.animal?.photoUrls ?? []);
+    
+    // Set selected house: prioritize existing animal's house, then preselected house
+    _selectedHouseId = widget.animal?.houseId ?? widget.preselectedHouse?.id;
+    
     _initPhotoSyncService();
+    _loadHouses();
   }
 
   Future<void> _initPhotoSyncService() async {
@@ -60,6 +77,53 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
       _photoSyncService = PhotoSyncService(UpstashConfig.redis, box);
       _photoSyncServiceReady = true;
     });
+  }
+
+  Future<void> _loadHouses() async {
+    setState(() {
+      _isLoadingHouses = true;
+    });
+    
+    try {
+      List<House> houses;
+      
+      // If we have a preselected house and no existing animal, we can just use that house
+      if (widget.preselectedHouse != null && widget.animal == null) {
+        houses = [widget.preselectedHouse!];
+        debugPrint('=== OPTIMIZED HOUSE LOADING ===');
+        debugPrint('Using preselected house: ${widget.preselectedHouse!.id} - ${widget.preselectedHouse!.fullAddress}');
+        debugPrint('Skipping full house list load for performance');
+      } else {
+        // Load all houses for editing existing animals or when no preselection
+        final houseService = ref.read(houseServiceProvider);
+        houses = await houseService.getHouses();
+        
+        debugPrint('=== FULL HOUSE LOADING ===');
+        debugPrint('Loading all houses because: ${widget.animal != null ? 'editing existing animal' : 'no preselected house'}');
+        debugPrint('Available houses for selection: ${houses.length}');
+      }
+      
+      // Debug: Print available houses
+      for (final house in houses) {
+        debugPrint('House: ${house.id} - ${house.fullAddress}');
+      }
+      debugPrint('Currently selected house ID: $_selectedHouseId');
+      debugPrint('=== END HOUSE LOADING DEBUG ===');
+      
+      setState(() {
+        _houses = houses;
+        _isLoadingHouses = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading houses: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading houses: $e')),
+      );
+      setState(() {
+        _isLoadingHouses = false;
+      });
+    }
   }
 
   @override
@@ -76,6 +140,20 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
   Future<void> _saveAnimal() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Additional validation for house selection
+    if (_selectedHouseId == null || _selectedHouseId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a house for the animal')),
+      );
+      return;
+    }
+
+    // Debug: Print what house is selected
+    debugPrint('=== ANIMAL SAVE DEBUG ===');
+    debugPrint('Selected house ID: $_selectedHouseId');
+    debugPrint('Animal name: ${_nameController.text}');
+    debugPrint('Animal species: ${_speciesController.text}');
+
     final animalService = ref.read(animalsProvider.notifier);
     final authService = ref.read(authServiceProvider);
     final currentUser = await authService.getCurrentUser();
@@ -83,7 +161,7 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
     try {
       // Only store file names in photoUrls
       final photoFileNames = _photoUrls.map((p) => p.split('/').last).toList();
-      print('Saving animal with photoUrls: [32m$photoFileNames[0m');
+      print('Saving animal with photoUrls: [32m$photoFileNames[0m');
       final animal = Animal(
         id: widget.animal?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text,
@@ -97,7 +175,7 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
         registrationDate: widget.animal?.registrationDate ?? DateTime.now(),
         lastUpdated: DateTime.now(),
         isActive: _isActive,
-        houseId: widget.animal?.houseId ?? 'default', // TODO: Implement house selection
+        houseId: _selectedHouseId!,
         locationId: widget.animal?.locationId ?? currentUser?.locationId ?? 'default',
         councilId: widget.animal?.councilId ?? currentUser?.councilId ?? 'council1', // Match test data
         ownerId: widget.animal?.ownerId,
@@ -107,11 +185,16 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
         metadata: widget.animal?.metadata,
       );
 
+      debugPrint('Animal object created with houseId: ${animal.houseId}');
+
       if (widget.animal == null) {
         await animalService.addAnimal(animal);
+        debugPrint('Animal added successfully');
       } else {
         await animalService.updateAnimal(animal);
+        debugPrint('Animal updated successfully');
       }
+      debugPrint('=== END ANIMAL SAVE DEBUG ===');
 
       // Sync photos after updating/adding animal
       if (_photoSyncServiceReady && _photoSyncService != null) {
@@ -121,6 +204,7 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
+      debugPrint('Error saving animal: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
@@ -225,6 +309,37 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
                     });
                   },
                 ),
+                const SizedBox(height: 16),
+
+                // House Selection
+                if (_isLoadingHouses)
+                  const CircularProgressIndicator()
+                else
+                  DropdownButtonFormField<String>(
+                    value: _selectedHouseId,
+                    decoration: const InputDecoration(
+                      labelText: 'House *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _houses.map((house) {
+                      return DropdownMenuItem(
+                        value: house.id,
+                        child: Text(house.fullAddress.isNotEmpty ? house.fullAddress : house.id),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      debugPrint('House selection changed to: $value');
+                      setState(() {
+                        _selectedHouseId = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a house';
+                      }
+                      return null;
+                    },
+                  ),
                 const SizedBox(height: 16),
 
                 // Advanced Information Section (Not for Census Users)

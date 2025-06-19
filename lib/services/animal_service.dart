@@ -415,6 +415,66 @@ class AnimalService extends StateNotifier<AsyncValue<List<Animal>>> {
 
   Future<List<Animal>> getAnimalsByLocation(String locationId) async => getAnimals();
 
+  // OPTIMIZED: Get animals by house ID using index
+  Future<List<Animal>> getAnimalsByHouse(String houseId) async {
+    try {
+      debugPrint('🏠 Getting animals for house: $houseId (OPTIMIZED)');
+      
+      final connectivity = await Connectivity().checkConnectivity();
+      if (connectivity == ConnectivityResult.none) {
+        // Offline: Load from Hive and filter
+        debugPrint('📱 Offline mode: Loading from local storage');
+        final animalBox = await Hive.openBox<Animal>('animals');
+        final allAnimals = animalBox.values.toList();
+        final houseAnimals = allAnimals.where((animal) => animal.houseId == houseId).toList();
+        debugPrint('Found ${houseAnimals.length} animals for house $houseId (offline)');
+        return houseAnimals;
+      }
+
+      // Online: Use house index for efficiency
+      final animalIds = await UpstashConfig.redis.smembers('animals:house:$houseId');
+      debugPrint('Found ${animalIds.length} animal IDs in house index for $houseId');
+      
+      if (animalIds.isEmpty) {
+        return [];
+      }
+
+      final animals = <Animal>[];
+      for (final animalId in animalIds) {
+        try {
+          final data = await UpstashConfig.redis.hgetall('animal:$animalId');
+          if (data != null && data.isNotEmpty) {
+            final jsonData = <String, dynamic>{};
+            data.forEach((key, value) {
+              if (key == 'metadata' && value != null) {
+                try {
+                  jsonData[key] = jsonDecode(value);
+                } catch (e) {
+                  debugPrint('Error decoding metadata: $e');
+                  jsonData[key] = null;
+                }
+              } else {
+                jsonData[key] = value;
+              }
+            });
+            final animal = Animal.fromJson(jsonData);
+            animals.add(animal);
+            debugPrint('Loaded animal: ${animal.name ?? animal.id} for house $houseId');
+          }
+        } catch (e) {
+          debugPrint('Error loading animal $animalId: $e');
+          continue;
+        }
+      }
+      
+      debugPrint('Successfully loaded ${animals.length} animals for house $houseId');
+      return animals;
+    } catch (e, stack) {
+      debugPrint('Error getting animals by house: $e\n$stack');
+      rethrow;
+    }
+  }
+
   Future<Animal?> getAnimalById(String id) async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();

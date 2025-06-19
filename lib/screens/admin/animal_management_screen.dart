@@ -11,6 +11,7 @@ import 'package:amrric_app/services/photo_sync_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:amrric_app/config/upstash_config.dart';
 import 'package:amrric_app/widgets/app_scaffold.dart';
+import 'package:amrric_app/utils/debug_helper.dart';
 
 class AnimalManagementScreen extends ConsumerStatefulWidget {
   const AnimalManagementScreen({super.key});
@@ -65,6 +66,13 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
       _error = null;
     });
     try {
+      // Debug: Check all animals in database
+      await DebugHelper.printAllAnimals();
+      await DebugHelper.printAnimalsWithDefaultHouse();
+      
+      // Cleanup: Remove animals with default house (run once)
+      await DebugHelper.cleanupAnimalsWithDefaultHouse();
+      
       final animalService = ref.read(animalsProvider.notifier);
       final user = _user;
       if (user == null) {

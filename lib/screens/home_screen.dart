@@ -14,6 +14,7 @@ import 'package:amrric_app/screens/census_data_screen.dart';
 import 'package:amrric_app/screens/census_location_data_screen.dart';
 import 'package:amrric_app/screens/house_management_screen.dart';
 import 'package:amrric_app/widgets/app_scaffold.dart';
+import 'package:amrric_app/screens/council_selection_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -394,6 +395,13 @@ class HomeScreen extends ConsumerWidget {
             'Welcome, ${user.name}',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Veterinary Services',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.grey[600],
+            ),
+          ),
           const SizedBox(height: 24),
           GridView.count(
             shrinkWrap: true,
@@ -404,24 +412,12 @@ class HomeScreen extends ConsumerWidget {
             children: [
               _buildMenuCard(
                 context,
-                'Animals',
-                Icons.pets,
-                () => Navigator.pushNamed(context, '/animals'),
-              ),
-              _buildMenuCard(
-                context,
-                'Medications',
-                Icons.medication,
-                () => Navigator.pushNamed(context, '/medications'),
-              ),
-              _buildMenuCard(
-                context,
-                'House Management',
-                Icons.home,
+                'Start Work',
+                Icons.business,
                 () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const HouseManagementScreen(),
+                    builder: (context) => const CouncilSelectionScreen(),
                   ),
                 ),
               ),
@@ -445,66 +441,62 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildCensusUserContent(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      children: [
-        _buildMenuCard(
-          context,
-          'Census Data',
-          Icons.people,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const CensusDataScreen(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Census Data Collection',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Population tracking and house management',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.grey[600],
             ),
           ),
-        ),
-        _buildMenuCard(
-          context,
-          'House Management',
-          Icons.home,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const HouseManagementScreen(),
-            ),
+          const SizedBox(height: 24),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            children: [
+              _buildMenuCard(
+                context,
+                'Start Census',
+                Icons.business,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CouncilSelectionScreen(),
+                  ),
+                ),
+              ),
+              _buildMenuCard(
+                context,
+                'Reports',
+                Icons.assessment,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
+                  ),
+                ),
+              ),
+              _buildMenuCard(
+                context,
+                'Settings',
+                Icons.settings,
+                () => Navigator.pushNamed(context, '/settings'),
+              ),
+            ],
           ),
-        ),
-        _buildMenuCard(
-          context,
-          'Reports',
-          Icons.assessment,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ReportsScreen(),
-            ),
-          ),
-        ),
-        _buildMenuCard(
-          context,
-          'Animal Records',
-          Icons.pets,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AnimalManagementScreen(),
-            ),
-          ),
-        ),
-        _buildMenuCard(
-          context,
-          'Location Data',
-          Icons.location_on,
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const CensusLocationDataScreen(),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

@@ -87,20 +87,42 @@ class House {
   }
 
   factory House.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely parse double values
+    double? parseDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        if (value.isEmpty) return null;
+        return double.tryParse(value);
+      }
+      return null;
+    }
+
+    // Helper function to safely parse boolean values
+    bool parseBool(dynamic value) {
+      if (value == null) return true;
+      if (value is bool) return value;
+      if (value is String) {
+        return value.toLowerCase() == 'true';
+      }
+      return true;
+    }
+
     return House(
-      id: json['id'],
-      locationId: json['locationId'],
-      councilId: json['councilId'],
-      houseNumber: json['houseNumber']?.isEmpty == true ? null : json['houseNumber'],
-      streetName: json['streetName']?.isEmpty == true ? null : json['streetName'],
-      suburb: json['suburb']?.isEmpty == true ? null : json['suburb'],
-      postcode: json['postcode']?.isEmpty == true ? null : json['postcode'],
-      latitude: json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null,
-      longitude: json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null,
-      description: json['description']?.isEmpty == true ? null : json['description'],
-      isActive: json['isActive'] is String ? json['isActive'] == 'true' : (json['isActive'] ?? true),
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
+      id: json['id']?.toString() ?? '',
+      locationId: json['locationId']?.toString() ?? '',
+      councilId: json['councilId']?.toString() ?? '',
+      houseNumber: json['houseNumber']?.toString().isEmpty == true ? null : json['houseNumber']?.toString(),
+      streetName: json['streetName']?.toString().isEmpty == true ? null : json['streetName']?.toString(),
+      suburb: json['suburb']?.toString().isEmpty == true ? null : json['suburb']?.toString(),
+      postcode: json['postcode']?.toString().isEmpty == true ? null : json['postcode']?.toString(),
+      latitude: parseDouble(json['latitude']),
+      longitude: parseDouble(json['longitude']),
+      description: json['description']?.toString().isEmpty == true ? null : json['description']?.toString(),
+      isActive: parseBool(json['isActive']),
+      createdAt: DateTime.parse(json['createdAt']?.toString() ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(json['updatedAt']?.toString() ?? DateTime.now().toIso8601String()),
       metadata: json['metadata'] is String ? jsonDecode(json['metadata']) : json['metadata'],
     );
   }

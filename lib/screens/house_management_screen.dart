@@ -46,16 +46,28 @@ class _HouseManagementScreenState extends ConsumerState<HouseManagementScreen> w
         onSave: (house) async {
           try {
             await ref.read(housesProvider.notifier).createHouse(house);
-            if (mounted && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('House added successfully')),
-              );
+            if (mounted) {
+              Navigator.pop(context);
+              // Use a post-frame callback to ensure the context is still valid
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('House added successfully')),
+                  );
+                }
+              });
             }
           } catch (e) {
-            if (mounted && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error adding house: $e')),
-              );
+            if (mounted) {
+              Navigator.pop(context);
+              // Use a post-frame callback to ensure the context is still valid
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error adding house: $e')),
+                  );
+                }
+              });
             }
           }
         },
@@ -71,16 +83,28 @@ class _HouseManagementScreenState extends ConsumerState<HouseManagementScreen> w
         onSave: (updatedHouse) async {
           try {
             await ref.read(housesProvider.notifier).updateHouse(updatedHouse);
-            if (mounted && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('House updated successfully')),
-              );
+            if (mounted) {
+              Navigator.pop(context);
+              // Use a post-frame callback to ensure the context is still valid
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('House updated successfully')),
+                  );
+                }
+              });
             }
           } catch (e) {
-            if (mounted && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error updating house: $e')),
-              );
+            if (mounted) {
+              Navigator.pop(context);
+              // Use a post-frame callback to ensure the context is still valid
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error updating house: $e')),
+                  );
+                }
+              });
             }
           }
         },
@@ -103,18 +127,28 @@ class _HouseManagementScreenState extends ConsumerState<HouseManagementScreen> w
             onPressed: () async {
               try {
                 await ref.read(housesProvider.notifier).deleteHouse(house.id);
-                if (mounted && context.mounted) {
+                if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('House deleted successfully')),
-                  );
+                  // Use a post-frame callback to ensure the context is still valid
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('House deleted successfully')),
+                      );
+                    }
+                  });
                 }
               } catch (e) {
-                if (mounted && context.mounted) {
+                if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting house: $e')),
-                  );
+                  // Use a post-frame callback to ensure the context is still valid
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error deleting house: $e')),
+                      );
+                    }
+                  });
                 }
               }
             },

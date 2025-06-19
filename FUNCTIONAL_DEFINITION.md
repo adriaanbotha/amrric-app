@@ -291,6 +291,146 @@ AMRRIC (Australian Marine Mammal Research and Information Centre) is a cross-pla
 - Entry Move Next Effect
 - Base Container Effect
 
+## User Roles and Navigation Flow
+
+### User Role Types
+The AMRRIC application supports four distinct user roles, each with specific access levels and navigation flows:
+
+1. **System Admin** - Full system access and administrative controls
+2. **Municipality Admin** - Council-level management and oversight
+3. **Veterinary User** - Animal health management and treatment tracking
+4. **Census User** - Population data collection and house management
+
+### Navigation Flow by User Role
+
+#### System Admin Users
+- **Direct Access**: Full application functionality through main dashboard
+- **Capabilities**: 
+  - User management
+  - Council management
+  - Community management
+  - House management (global)
+  - System settings
+  - All animal management features
+  - Complete reporting suite
+
+#### Municipality Admin Users
+- **Direct Access**: Council-level management through main dashboard
+- **Capabilities**:
+  - Council data management
+  - Community management within their councils
+  - Reports for their jurisdiction
+  - Animal data within their councils
+
+#### Veterinary Users - Hierarchical Navigation Flow
+**Step 1: Council Selection**
+- Upon login, display list of councils they have access to
+- Click on a council to proceed to communities
+
+**Step 2: Community Selection**
+- Display list of communities within the selected council
+- Show house count per community
+- Click on a community to proceed to houses
+
+**Step 3: House Management**
+- Display list of houses within the selected community
+- **House Operations Available:**
+  - View existing houses
+  - Add new houses
+  - Edit house details (address, owner, GPS coordinates, description)
+  - Delete houses
+  - Search and filter houses
+
+**Step 4: House Selection & Animal Management**
+- Click on a specific house to access animal management
+- **Animal Operations Available:**
+  - View all animals associated with the house
+  - Add new animals to the house
+  - **Complete Animal Management:**
+    - Animal registration and identification
+    - Medical treatment administration and recording
+    - Treatment history timeline
+    - Vaccination schedules and records
+    - Health condition monitoring
+    - Medication tracking
+    - Surgical procedure records
+    - Follow-up appointment scheduling
+    - Photo documentation
+    - Clinical notes and observations
+  - **Historical Data:**
+    - If an animal was previously recorded at this house, display complete history
+    - Treatment timeline showing all previous interventions
+    - Medical history continuity across visits
+    - Progress tracking over time
+
+**Navigation Breadcrumbs:** Council > Community > Houses > Selected House > Animals
+
+#### Census Users - Hierarchical Navigation Flow
+**Step 1: Council Selection**
+- Upon login, display list of councils they have access to
+- Click on a council to proceed to communities
+
+**Step 2: Community Selection**
+- Display list of communities within the selected council
+- Show house count and animal population data per community
+- Click on a community to proceed to houses
+
+**Step 3: House Management**
+- Display list of houses within the selected community
+- **House Operations Available:**
+  - View existing houses
+  - Add new houses
+  - Edit house details (address, owner, GPS coordinates, description)
+  - Delete houses
+  - Search and filter houses
+
+**Step 4: House Selection & Animal Census**
+- Click on a specific house to access animal census management
+- **Animal Census Operations Available:**
+  - View all animals recorded at the house
+  - Add new animals discovered during census
+  - **Census-Specific Animal Management:**
+    - Animal identification and registration
+    - Population counting and tracking
+    - Basic health condition assessment
+    - Sterilization status recording
+    - Ownership verification
+    - Photo documentation for identification
+    - Census notes and observations
+  - **Historical Census Data:**
+    - If an animal was previously counted at this house, display census history
+    - Population changes over time
+    - Health status progression
+    - Ownership changes
+    - Movement tracking between census periods
+
+**Navigation Breadcrumbs:** Council > Community > Houses > Selected House > Census Animals
+
+### Key Features of the Hierarchical Flow
+
+#### Data Persistence and History
+- **Animal Continuity**: When animals are encountered again at the same house, all previous data is retained and displayed
+- **Treatment History**: Complete timeline of all veterinary interventions and treatments
+- **Census History**: Population tracking over multiple census periods
+- **Photo History**: Visual documentation over time for identification and condition monitoring
+
+#### House-Centric Data Organization
+- All animal data is organized by house location
+- Easy tracking of animal populations per household
+- Simplified data collection workflow
+- Geographic organization of animal health and census data
+
+#### Role-Specific Data Views
+- **Veterinary Users**: Focus on medical treatments, health conditions, and clinical data
+- **Census Users**: Focus on population data, basic health status, and demographic information
+- **Shared Data**: Both roles contribute to the complete animal profile
+
+#### Offline Capability
+- All data collection can occur offline
+- Synchronization when connectivity is restored
+- Local data storage maintains navigation state
+- Pending changes tracking per location level
+
 ## Screen Functionality
 
 ### 1. Login Screen
