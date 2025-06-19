@@ -12,6 +12,7 @@ import 'package:amrric_app/screens/admin/location_management_screen.dart';
 import 'package:amrric_app/screens/admin/animal_management_screen.dart';
 import 'package:amrric_app/screens/census_data_screen.dart';
 import 'package:amrric_app/screens/census_location_data_screen.dart';
+import 'package:amrric_app/screens/house_management_screen.dart';
 import 'package:amrric_app/widgets/app_scaffold.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -107,6 +108,19 @@ class HomeScreen extends ConsumerWidget {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.home),
+                title: const Text('House Management'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HouseManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.settings),
                 title: const Text('System Settings'),
                 onTap: () {
@@ -115,6 +129,95 @@ class HomeScreen extends ConsumerWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const SystemSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+            ],
+            // Veterinary User Section
+            if (user.role == UserRole.veterinaryUser) ...[
+              ListTile(
+                leading: const Icon(Icons.pets),
+                title: const Text('Animals'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/animals');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.medication),
+                title: const Text('Medications'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/medications');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.home),
+                title: const Text('House Management'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HouseManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+            ],
+            // Census User Section
+            if (user.role == UserRole.censusUser) ...[
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: const Text('Census Data'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CensusDataScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.home),
+                title: const Text('House Management'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HouseManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.pets),
+                title: const Text('Animal Records'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AnimalManagementScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_on),
+                title: const Text('Location Data'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CensusLocationDataScreen(),
                     ),
                   );
                 },
@@ -188,6 +291,17 @@ class HomeScreen extends ConsumerWidget {
             context,
             MaterialPageRoute(
               builder: (context) => const UserManagementScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
+          'House Management',
+          Icons.home,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HouseManagementScreen(),
             ),
           ),
         ),
@@ -302,6 +416,17 @@ class HomeScreen extends ConsumerWidget {
               ),
               _buildMenuCard(
                 context,
+                'House Management',
+                Icons.home,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HouseManagementScreen(),
+                  ),
+                ),
+              ),
+              _buildMenuCard(
+                context,
                 'Reports',
                 Icons.assessment,
                 () => Navigator.pushNamed(context, '/reports'),
@@ -332,6 +457,17 @@ class HomeScreen extends ConsumerWidget {
             context,
             MaterialPageRoute(
               builder: (context) => const CensusDataScreen(),
+            ),
+          ),
+        ),
+        _buildMenuCard(
+          context,
+          'House Management',
+          Icons.home,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HouseManagementScreen(),
             ),
           ),
         ),
