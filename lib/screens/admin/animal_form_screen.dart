@@ -316,7 +316,7 @@ class _AnimalFormScreenState extends ConsumerState<AnimalFormScreen> {
                   const CircularProgressIndicator()
                 else
                   DropdownButtonFormField<String>(
-                    value: _selectedHouseId,
+                    value: _houses.any((house) => house.id == _selectedHouseId) ? _selectedHouseId : null,
                     decoration: const InputDecoration(
                       labelText: 'House *',
                       border: OutlineInputBorder(),

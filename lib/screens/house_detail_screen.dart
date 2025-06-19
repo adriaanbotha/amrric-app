@@ -6,6 +6,7 @@ import 'package:amrric_app/models/animal.dart';
 import 'package:amrric_app/models/user.dart';
 import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/screens/admin/animal_form_screen.dart';
+import 'package:amrric_app/screens/animal_detail_screen.dart';
 import 'package:amrric_app/widgets/loading_indicator.dart';
 import 'package:amrric_app/widgets/error_display.dart';
 
@@ -111,8 +112,9 @@ class _HouseDetailScreenState extends ConsumerState<HouseDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AnimalFormScreen(
-          animal: animal,
+        builder: (context) => AnimalDetailScreen(
+          animalId: animal.id,
+          animalName: animal.name ?? 'Unnamed ${animal.species}',
         ),
       ),
     ).then((_) {

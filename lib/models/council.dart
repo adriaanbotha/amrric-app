@@ -54,7 +54,7 @@ class Council {
   }
 
   Map<String, dynamic> toJson() {
-    debugPrint('Converting Council to JSON: $this');
+    debugPrint('Converting Council to JSON for storage: ${this.name}');
     return {
       'id': id,
       'name': name,
@@ -67,7 +67,7 @@ class Council {
   }
 
   factory Council.fromJson(Map<String, dynamic> json) {
-    debugPrint('Creating Council from JSON: $json');
+    debugPrint('Loading Council from database: ${json['name']}');
     try {
       return Council(
         id: json['id'] as String,
@@ -79,7 +79,7 @@ class Council {
         imageUrl: json['imageUrl'] as String?,
       );
     } catch (e, stack) {
-      debugPrint('Error creating Council from JSON: $e');
+      debugPrint('Error loading Council from JSON: $e');
       debugPrint('Stack trace: $stack');
       rethrow;
     }
