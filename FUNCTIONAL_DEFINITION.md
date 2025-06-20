@@ -2586,3 +2586,257 @@ All images and icons are optimized for both performance and quality, with approp
 - Navigation: Tab bar icons (simplified silhouettes)
 
 All screens maintain a consistent visual language, with standardized header patterns, navigation elements, form controls, and action buttons. The interface follows iOS design guidelines while implementing a custom color scheme based on the AMRRIC branding.
+
+## Enhanced Clinical Notes System
+
+### Template Management
+The clinical notes system supports a comprehensive templated approach to veterinary record keeping, with pre-built clinical templates that can be customized and filtered based on animal characteristics.
+
+#### Pre-built Clinical Templates
+- **Template Naming Convention**: Year + Location + Procedure (e.g., "2024 APY Castrate", "2024 APY Dog Spay", "2024 UQ Cherbourg Dog Spey")
+- **Template Categories**: 
+  - Castration procedures
+  - Spay procedures
+  - Species-specific protocols
+  - Location-specific procedures
+- **Template Versioning**: Annual updates and location-specific variations
+- **Template Access Control**: Role-based access to specific templates
+
+#### Template Filtering System
+- **Species Filter**: Any Species, Dog, Cat
+- **Gender Filter**: Any Gender, Male, Female
+- **Dynamic Content**: Templates adjust available options based on selected filters
+- **Quick Selection**: Common combinations readily available
+
+### Clinical Note Structure Categories
+
+#### 1. Problems/Status Categories
+The system provides standardized status options for rapid classification:
+- **Biosecurity**: For disease containment and prevention protocols
+- **Cancel Desexing**: When surgical procedures need to be postponed or cancelled
+- **Deceased**: For recording animal deaths with associated protocols
+- **Fencing Issues**: For property-related animal welfare concerns
+- **Found**: For stray or found animals
+- **Lost**: For missing animals
+- **Needs Desexing**: For animals requiring sterilization
+- **Stolen**: For theft reports and investigations
+- **Suspect Ehrlichia**: For potential tick-borne disease cases
+- **Vet Needed Now**: For urgent veterinary attention
+- **Welfare Case**: For animal welfare investigations
+
+#### 2. Clinical Signs Assessment
+Comprehensive list of observable clinical signs:
+- **Blood in Wee**: Urinary system issues
+- **Dehydrated**: Fluid balance problems
+- **Diarrhoea**: Gastrointestinal issues
+- **Distended Abdomen**: Potential internal problems
+- **Itchy**: Dermatological conditions
+- **Limping**: Musculoskeletal issues
+- **Lump**: Potential masses or growths
+- **Open Wound**: Traumatic injuries
+- **Other Sign**: Free text for unlisted observations
+- **Sore Ear**: Aural problems
+- **Sore Eye**: Ocular conditions
+- **Vomiting**: Gastrointestinal distress
+
+#### 3. Disease Classification
+Systematic disease categorization:
+- **Bacterial**: Bacterial infections and diseases
+- **CTVT**: Canine Transmissible Venereal Tumor
+- **Fracture**: Bone fractures and breaks
+- **Fungal**: Fungal infections
+- **Other Disease**: Non-categorized diseases
+- **Other Neoplasia**: Various tumor types
+- **Parasitic**: Parasitic infections
+- **Protozoal**: Protozoal diseases
+- **Soft Tissue**: Soft tissue injuries and diseases
+- **Vector-borne**: Tick and flea-borne diseases
+- **Viral**: Viral infections
+
+#### 4. Procedure Categories
+
+**General Procedures:**
+- **Clinical Exam**: Routine health assessments
+- **Clip Coat**: Grooming and preparation procedures
+- **Microchip**: Identification implantation
+- **Trim Nails**: Basic grooming
+- **Wound Treatment**: Injury management
+
+**Surgical Procedures:**
+- **Amputation**: Limb or tail removal
+- **CTVT debridement**: Tumor removal and treatment
+- **Lump Removal**: Mass excision
+- **Stitchup**: Wound closure
+
+**Desexing Procedures:**
+- **Species-specific protocols**: Different approaches for dogs vs cats
+- **Gender-specific procedures**: Tailored to male/female anatomy
+- **Age-appropriate techniques**: Protocols based on animal age
+
+**Other Procedures:**
+- **Custom procedure entry**: Free text for non-listed procedures
+
+#### 5. Treatment Categories and Drug Database
+
+**Treatment Classifications:**
+- **Anaesthetic/sedative**: For surgical and diagnostic procedures
+- **Analgesic**: Pain management medications
+- **Antibiotic**: Infection prevention and treatment
+- **Anti-Inflammatory (Anti-Inflam)**: Inflammation reduction
+
+**Comprehensive Drug Database:**
+- **ACP**: Various concentrations (2mg/ml, 10mg/ml, 25mg tablets)
+- **Alfaxan**: Anaesthetic agent
+- **Antipam/Antisedan**: Reversal agents
+- **Atrosite**: Haemostatic agent
+- **Carprieve/Rimadyl/Carprofen**: Anti-inflammatory medications
+- **Cephazolin**: Antibiotic
+- **Dexafort/Dexapent**: Corticosteroids
+- **Diazepam/Valium**: Sedative and muscle relaxant
+- **Iso**: Isoflurane anaesthetic
+- **Ketamine**: Anaesthetic agent
+- **Lignocaine**: Local anaesthetic
+- **Medetate/Domitor**: Sedative agents
+- **Meloxicam/Metacam/Loxicom**: Anti-inflammatory medications
+- **Methadone**: Opioid analgesic
+- **Nexgard Spectra**: Parasite prevention
+- **Pred-X/Macralone/Prednil**: Corticosteroids
+- **Previcox**: Anti-inflammatory medication
+- **Propofol Lipuro 1%**: Anaesthetic agent
+- **Thiobarb**: Barbiturate anaesthetic
+- **Torbugesic/Butorgesic**: Opioid analgesics
+- **Trocoxil**: Long-acting anti-inflammatory
+- **Xylazil**: Sedative (various concentrations: 20, 100)
+- **Zoletil**: Anaesthetic combination
+
+### Drug Administration Details
+For each medication administered, the system captures:
+- **Drug Name**: Selected from searchable database with auto-complete
+- **Dose**: Numeric value with validation
+- **Dose Unit**: ml, mg, tablets, etc. with species-appropriate defaults
+- **Route**: IV, IM, SC, PO, topical, etc. with drug-specific options
+- **Notes**: Free text for additional instructions and observations
+
+### Enhanced Clinical Note Fields
+- **Body Part(s)**: Anatomical location specification for procedures, signs, or diseases
+- **Procedure Details**: Specific procedure information with pre-populated options
+- **Responsible Vet Selection**: Dropdown with available veterinarians and "No Responsible Vet" option
+- **Date/Time Stamping**: Automatic timestamps for all entries with manual override capability
+- **Species/Gender Filtering**: Dynamic template filtering based on animal characteristics
+- **Clinical Assessment**: Structured assessment forms with scoring systems
+- **Follow-up Requirements**: Automated scheduling and reminder system
+- **Photo Documentation**: Integrated camera access with automatic association to clinical notes
+
+### Data Structure for Upstash Storage
+
+```json
+{
+  "clinical_note_templates": {
+    "template_id": "string",
+    "template_name": "string",
+    "year": "number",
+    "location": "string",
+    "procedure_type": "string",
+    "species_filter": ["Any", "Dog", "Cat"],
+    "gender_filter": ["Any", "Male", "Female"],
+    "categories": {
+      "problems": ["Biosecurity", "Cancel Desexing", "Deceased", "Fencing Issues", "Found", "Lost", "Needs Desexing", "Stolen", "Suspect Ehrlichia", "Vet Needed Now", "Welfare Case"],
+      "procedures": ["General", "Surgical", "Desexed", "Other"],
+      "treatments": ["Anaesthetic/sedative", "Analgesic", "Antibiotic", "Anti-Inflammatory"]
+    },
+    "predefined_content": {
+      "clinical_signs": ["Blood in Wee", "Dehydrated", "Diarrhoea", "Distended Abdomen", "Itchy", "Limping", "Lump", "Open Wound", "Other Sign", "Sore Ear", "Sore Eye", "Vomiting"],
+      "diseases": ["Bacterial", "CTVT", "Fracture", "Fungal", "Other Disease", "Other Neoplasia", "Parasitic", "Protozoal", "Soft Tissue", "Vector-borne", "Viral"],
+      "procedures": ["Clinical Exam", "Clip Coat", "Microchip", "Trim Nails", "Wound Treatment", "Amputation", "CTVT debridement", "Lump Removal", "Stitchup"],
+      "medications": [
+        {
+          "name": "ACP",
+          "concentrations": ["2mg/ml", "10mg/ml", "25mg tablets"],
+          "default_route": ["IM", "IV", "PO"]
+        },
+        // ... additional medications
+      ]
+    },
+    "created_by": "string",
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  },
+  "drug_database": {
+    "drug_id": "string",
+    "drug_name": "string",
+    "common_names": ["array of alternative names"],
+    "concentrations": ["array of available concentrations"],
+    "default_dose_units": ["ml", "mg", "tablets"],
+    "common_routes": ["IV", "IM", "SC", "PO", "topical"],
+    "species_specific": "boolean",
+    "contraindications": ["array of conditions"],
+    "standard_doses": {
+      "dog": "dosing_information",
+      "cat": "dosing_information"
+    }
+  },
+  "clinical_notes": {
+    "note_id": "string",
+    "animal_id": "string",
+    "template_id": "string",
+    "date": "timestamp",
+    "responsible_vet": "string",
+    "problems": ["array of selected problems"],
+    "clinical_signs": [
+      {
+        "sign": "string",
+        "body_parts": ["array"],
+        "notes": "string"
+      }
+    ],
+    "diseases": [
+      {
+        "disease": "string",
+        "body_parts": ["array"],
+        "notes": "string"
+      }
+    ],
+    "procedures": [
+      {
+        "procedure": "string",
+        "body_parts": ["array"],
+        "notes": "string"
+      }
+    ],
+    "treatments": [
+      {
+        "drug_name": "string",
+        "dose": "number",
+        "dose_unit": "string",
+        "route": "string",
+        "notes": "string"
+      }
+    ],
+    "additional_notes": "string",
+    "photos": ["array of photo URLs"],
+    "created_by": "string",
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  }
+}
+```
+
+### User Interface Requirements
+- **Multi-tab Interface**: Problems/Procedure/Treatment tabs for organized data entry
+- **Searchable Dropdowns**: For medications, procedures, and clinical signs
+- **Dynamic Filtering**: Real-time filtering based on species/gender selection
+- **Template Builder**: Administrative interface for creating custom templates
+- **Quick-add Buttons**: For frequently used items
+- **Auto-complete Functionality**: For drug names and procedures with fuzzy matching
+- **Responsive Design**: Optimized for tablet use in field conditions
+- **Offline Capability**: Full functionality without internet connection
+- **Photo Integration**: Direct camera access with automatic image compression and association
+
+### Business Rules and Validation
+- **Template Access**: Users can only access templates appropriate for their role and location
+- **Drug Calculations**: Automatic dose calculations based on animal weight and species
+- **Contraindication Warnings**: Alerts for drug interactions and contraindications
+- **Completion Validation**: Required fields must be completed before saving
+- **Audit Trail**: All changes tracked with user attribution and timestamps
+- **Data Integrity**: Cross-references between procedures, treatments, and diagnoses
+- **Regulatory Compliance**: Meets veterinary record-keeping requirements
