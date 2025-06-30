@@ -6,6 +6,7 @@ import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/services/animal_records_service.dart';
 import 'package:amrric_app/providers/animal_records_provider.dart';
+import 'package:amrric_app/screens/clinical_notes_screen.dart';
 
 class AnimalDetailScreen extends ConsumerStatefulWidget {
   final String animalId;
@@ -26,6 +27,21 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   bool _isLoading = true;
   String? _error;
   User? _currentUser;
+
+  // Dropdown options for specific fields
+  static const List<String> _speciesOptions = ['Cat', 'Dog'];
+  static const List<String> _genderOptions = ['Male', 'Female'];
+  static const List<String> _colorOptions = [
+    'Black', 'White', 'Brown', 'Gray', 'Orange', 'Cream', 'Tan', 'Brindle', 
+    'Tricolor', 'Black and White', 'Brown and White', 'Gray and White', 
+    'Orange and White', 'Calico', 'Tabby', 'Tortoiseshell', 'Other'
+  ];
+  static const List<String> _reproOptions = [
+    'Unknown', 'Intact', 'Desexed', 'Pregnant', 'Lactating'
+  ];
+  static const List<String> _sizeOptions = [
+    'Unknown', 'Very Small', 'Small', 'Medium', 'Large', 'Very Large'
+  ];
 
   @override
   void initState() {
@@ -72,6 +88,20 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   Future<void> _addRecord(String recordType) async {
     if (_animal == null || _currentUser == null) return;
 
+    // Navigate to the comprehensive clinical notes screen for clinical notes
+    if (recordType == 'clinical_notes') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ClinicalNotesScreen(
+            animalId: widget.animalId,
+            animalName: _animal!.name ?? widget.animalName,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // For other record types, use the existing dialog
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _RecordDialog(
@@ -148,7 +178,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     TextInputType keyboardType = TextInputType.text,
   }) {
     return GestureDetector(
-      onTap: () => _showEditDialog(label, value, onSave, keyboardType),
+      onTap: () => _showFieldEditor(label, value, onSave, keyboardType),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
@@ -172,7 +202,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
             ),
             Expanded(
               child: Text(
-                value.isEmpty ? 'Tap to add' : '$value$suffix',
+                value.isEmpty ? 'Tap to select' : '$value$suffix',
                 style: TextStyle(
                   color: value.isEmpty ? Colors.grey.shade600 : Colors.black87,
                   fontStyle: value.isEmpty ? FontStyle.italic : FontStyle.normal,
@@ -181,7 +211,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               ),
             ),
             Icon(
-              Icons.edit_outlined,
+              _getFieldIcon(label),
               size: 18,
               color: Theme.of(context).primaryColor.withOpacity(0.6),
             ),
@@ -191,45 +221,75 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     );
   }
 
-  Future<void> _showEditDialog(
+  IconData _getFieldIcon(String label) {
+    switch (label.toLowerCase()) {
+      case 'species': return Icons.pets;
+      case 'gender': return Icons.wc;
+      case 'colour': return Icons.palette;
+      case 'repro': return Icons.favorite;
+      case 'size': return Icons.straighten;
+      case 'mc': return Icons.qr_code;
+      case 'microchip': return Icons.qr_code;
+      default: return Icons.edit_outlined;
+    }
+  }
+
+  Future<void> _showFieldEditor(
     String label,
     String currentValue,
     Function(String) onSave,
     TextInputType keyboardType,
   ) async {
-    final controller = TextEditingController(text: currentValue);
+    String? result;
     
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit $label'),
-        content: TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            labelText: label,
-            border: const OutlineInputBorder(),
+         // Use dropdown for specific fields
+     switch (label.toLowerCase()) {
+       case 'species':
+         result = await _showDropdownDialog(label, currentValue, _speciesOptions);
+         break;
+       case 'gender':
+         result = await _showDropdownDialog(label, currentValue, _genderOptions);
+         break;
+       case 'colour':
+         result = await _showDropdownDialog(label, currentValue, _colorOptions);
+         break;
+       case 'repro':
+         result = await _showDropdownDialog(label, currentValue, _reproOptions);
+         break;
+       case 'size':
+         result = await _showDropdownDialog(label, currentValue, _sizeOptions);
+         break;
+       default:
+        // Use text input for other fields
+        result = await showDialog<String>(
+          context: context,
+          builder: (context) => _EditDialog(
+            label: label,
+            currentValue: currentValue,
+            keyboardType: keyboardType,
           ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    
-    if (result != null && result != currentValue) {
-      onSave(result);
+        );
+        break;
     }
     
-    controller.dispose();
+    if (result != null && result != currentValue && mounted) {
+      onSave(result);
+    }
+  }
+
+  Future<String?> _showDropdownDialog(
+    String label,
+    String currentValue,
+    List<String> options,
+  ) async {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => _DropdownDialog(
+        label: label,
+        currentValue: currentValue,
+        options: options,
+      ),
+    );
   }
 
   Future<void> _updateAnimalField(String field, dynamic value) async {
@@ -240,10 +300,15 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
       
       // Create updated animal with new field value
       final updatedAnimal = _animal!.copyWith(
+        species: field == 'species' ? value as String : _animal!.species,
+        sex: field == 'sex' ? value as String : _animal!.sex,
         breed: field == 'breed' ? value as String? : _animal!.breed,
         color: field == 'color' ? value as String? : _animal!.color,
         estimatedAge: field == 'estimatedAge' ? value as int? : _animal!.estimatedAge,
         weight: field == 'weight' ? value as double? : _animal!.weight,
+        reproductiveStatus: field == 'reproductiveStatus' ? value as String? : _animal!.reproductiveStatus,
+        size: field == 'size' ? value as String? : _animal!.size,
+        microchipNumber: field == 'microchipNumber' ? value as String? : _animal!.microchipNumber,
         lastUpdated: DateTime.now(),
       );
       
@@ -385,8 +450,20 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       _buildInfoRow('Owner', _animal!.ownerId ?? '', null),
                       const SizedBox(height: 8),
                       
-                      // Gender with icon
-                      _buildInfoRow('Gender', _animal!.sex, Icons.pets),
+                      // Gender with icon (make editable)
+                      _buildEditableField(
+                        'Gender',
+                        _animal!.sex,
+                        (value) => _updateAnimalField('sex', value),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Species (editable)
+                      _buildEditableField(
+                        'Species',
+                        _animal!.species,
+                        (value) => _updateAnimalField('species', value),
+                      ),
                       const SizedBox(height: 8),
                       
                       // Breed (editable)
@@ -397,8 +474,12 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       
-                      // Repro status
-                      _buildInfoRow('Repro', 'Unknown', Icons.help_outline),
+                      // Repro status (editable)
+                      _buildEditableField(
+                        'Repro',
+                        _animal!.reproductiveStatus ?? 'Unknown',
+                        (value) => _updateAnimalField('reproductiveStatus', value),
+                      ),
                       const SizedBox(height: 8),
                       
                       // Age (editable)
@@ -410,8 +491,12 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       
-                      // Size
-                      _buildInfoRow('Size', 'Unknown', null),
+                      // Size (editable)
+                      _buildEditableField(
+                        'Size',
+                        _animal!.size ?? 'Unknown',
+                        (value) => _updateAnimalField('size', value),
+                      ),
                       const SizedBox(height: 8),
                       
                       // Weight (editable)
@@ -423,8 +508,12 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       
-                      // Microchip
-                      _buildInfoRow('MC', _animal!.microchipNumber ?? '', Icons.qr_code),
+                      // Microchip (editable)
+                      _buildEditableField(
+                        'MC',
+                        _animal!.microchipNumber ?? '',
+                        (value) => _updateAnimalField('microchipNumber', value),
+                      ),
                       const SizedBox(height: 8),
                       
                       // Registration
@@ -724,6 +813,99 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
         Text(
           '$label: $value',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+}
+
+// Dropdown dialog widget for predefined options
+class _DropdownDialog extends StatefulWidget {
+  final String label;
+  final String currentValue;
+  final List<String> options;
+
+  const _DropdownDialog({
+    required this.label,
+    required this.currentValue,
+    required this.options,
+  });
+
+  @override
+  State<_DropdownDialog> createState() => _DropdownDialogState();
+}
+
+class _DropdownDialogState extends State<_DropdownDialog> {
+  String? selectedValue;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set initial selection if current value exists in options
+    selectedValue = widget.options.contains(widget.currentValue) ? widget.currentValue : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Select ${widget.label}'),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxWidth: MediaQuery.of(context).size.width * 0.8,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.options.map((option) {
+              final isSelected = selectedValue == option;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  title: Text(
+                    option,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? Theme.of(context).primaryColor : null,
+                      fontSize: 14,
+                    ),
+                  ),
+                  leading: Radio<String>(
+                    value: option,
+                    groupValue: selectedValue,
+                    onChanged: (value) => setState(() => selectedValue = value),
+                    activeColor: Theme.of(context).primaryColor,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: isSelected 
+                          ? Theme.of(context).primaryColor 
+                          : Colors.grey.withOpacity(0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  tileColor: isSelected 
+                      ? Theme.of(context).primaryColor.withOpacity(0.1) 
+                      : null,
+                  onTap: () => setState(() => selectedValue = option),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: selectedValue != null 
+              ? () => Navigator.pop(context, selectedValue) 
+              : null,
+          child: const Text('Select'),
         ),
       ],
     );
@@ -1065,5 +1247,63 @@ class _RecordDialogState extends State<_RecordDialog> {
     }
 
     Navigator.pop(context, recordData);
+  }
+}
+
+// Separate dialog widget to properly manage TextEditingController lifecycle
+class _EditDialog extends StatefulWidget {
+  final String label;
+  final String currentValue;
+  final TextInputType keyboardType;
+
+  const _EditDialog({
+    required this.label,
+    required this.currentValue,
+    required this.keyboardType,
+  });
+
+  @override
+  State<_EditDialog> createState() => _EditDialogState();
+}
+
+class _EditDialogState extends State<_EditDialog> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Edit ${widget.label}'),
+      content: TextField(
+        controller: _controller,
+        keyboardType: widget.keyboardType,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          border: const OutlineInputBorder(),
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Save'),
+        ),
+      ],
+    );
   }
 } 

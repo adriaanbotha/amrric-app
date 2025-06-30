@@ -21,6 +21,8 @@ class Animal with _$Animal {
     @JsonKey(fromJson: _parseEstimatedAge) int? estimatedAge,
     @JsonKey(fromJson: _parseWeight) double? weight,
     String? microchipNumber,
+    String? reproductiveStatus,
+    String? size,
     @JsonKey(fromJson: _parseRequiredDateTime) required DateTime registrationDate,
     @JsonKey(fromJson: _parseRequiredDateTime) required DateTime lastUpdated,
     required bool isActive,

@@ -27,6 +27,8 @@ mixin _$Animal {
   @JsonKey(fromJson: _parseWeight)
   double? get weight => throw _privateConstructorUsedError;
   String? get microchipNumber => throw _privateConstructorUsedError;
+  String? get reproductiveStatus => throw _privateConstructorUsedError;
+  String? get size => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _parseRequiredDateTime)
   DateTime get registrationDate => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _parseRequiredDateTime)
@@ -65,6 +67,8 @@ abstract class $AnimalCopyWith<$Res> {
       @JsonKey(fromJson: _parseEstimatedAge) int? estimatedAge,
       @JsonKey(fromJson: _parseWeight) double? weight,
       String? microchipNumber,
+      String? reproductiveStatus,
+      String? size,
       @JsonKey(fromJson: _parseRequiredDateTime) DateTime registrationDate,
       @JsonKey(fromJson: _parseRequiredDateTime) DateTime lastUpdated,
       bool isActive,
@@ -103,6 +107,8 @@ class _$AnimalCopyWithImpl<$Res, $Val extends Animal>
     Object? estimatedAge = freezed,
     Object? weight = freezed,
     Object? microchipNumber = freezed,
+    Object? reproductiveStatus = freezed,
+    Object? size = freezed,
     Object? registrationDate = null,
     Object? lastUpdated = null,
     Object? isActive = null,
@@ -152,6 +158,14 @@ class _$AnimalCopyWithImpl<$Res, $Val extends Animal>
       microchipNumber: freezed == microchipNumber
           ? _value.microchipNumber
           : microchipNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      reproductiveStatus: freezed == reproductiveStatus
+          ? _value.reproductiveStatus
+          : reproductiveStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      size: freezed == size
+          ? _value.size
+          : size // ignore: cast_nullable_to_non_nullable
               as String?,
       registrationDate: null == registrationDate
           ? _value.registrationDate
@@ -222,6 +236,8 @@ abstract class _$$AnimalImplCopyWith<$Res> implements $AnimalCopyWith<$Res> {
       @JsonKey(fromJson: _parseEstimatedAge) int? estimatedAge,
       @JsonKey(fromJson: _parseWeight) double? weight,
       String? microchipNumber,
+      String? reproductiveStatus,
+      String? size,
       @JsonKey(fromJson: _parseRequiredDateTime) DateTime registrationDate,
       @JsonKey(fromJson: _parseRequiredDateTime) DateTime lastUpdated,
       bool isActive,
@@ -258,6 +274,8 @@ class __$$AnimalImplCopyWithImpl<$Res>
     Object? estimatedAge = freezed,
     Object? weight = freezed,
     Object? microchipNumber = freezed,
+    Object? reproductiveStatus = freezed,
+    Object? size = freezed,
     Object? registrationDate = null,
     Object? lastUpdated = null,
     Object? isActive = null,
@@ -307,6 +325,14 @@ class __$$AnimalImplCopyWithImpl<$Res>
       microchipNumber: freezed == microchipNumber
           ? _value.microchipNumber
           : microchipNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      reproductiveStatus: freezed == reproductiveStatus
+          ? _value.reproductiveStatus
+          : reproductiveStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      size: freezed == size
+          ? _value.size
+          : size // ignore: cast_nullable_to_non_nullable
               as String?,
       registrationDate: null == registrationDate
           ? _value.registrationDate
@@ -373,6 +399,8 @@ class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
       @JsonKey(fromJson: _parseEstimatedAge) this.estimatedAge,
       @JsonKey(fromJson: _parseWeight) this.weight,
       this.microchipNumber,
+      this.reproductiveStatus,
+      this.size,
       @JsonKey(fromJson: _parseRequiredDateTime) required this.registrationDate,
       @JsonKey(fromJson: _parseRequiredDateTime) required this.lastUpdated,
       required this.isActive,
@@ -412,6 +440,10 @@ class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
   final double? weight;
   @override
   final String? microchipNumber;
+  @override
+  final String? reproductiveStatus;
+  @override
+  final String? size;
   @override
   @JsonKey(fromJson: _parseRequiredDateTime)
   final DateTime registrationDate;
@@ -479,7 +511,7 @@ class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'Animal(id: $id, name: $name, species: $species, breed: $breed, color: $color, sex: $sex, estimatedAge: $estimatedAge, weight: $weight, microchipNumber: $microchipNumber, registrationDate: $registrationDate, lastUpdated: $lastUpdated, isActive: $isActive, houseId: $houseId, locationId: $locationId, councilId: $councilId, ownerId: $ownerId, photoUrls: $photoUrls, medicalHistory: $medicalHistory, censusData: $censusData, metadata: $metadata, images: $images)';
+    return 'Animal(id: $id, name: $name, species: $species, breed: $breed, color: $color, sex: $sex, estimatedAge: $estimatedAge, weight: $weight, microchipNumber: $microchipNumber, reproductiveStatus: $reproductiveStatus, size: $size, registrationDate: $registrationDate, lastUpdated: $lastUpdated, isActive: $isActive, houseId: $houseId, locationId: $locationId, councilId: $councilId, ownerId: $ownerId, photoUrls: $photoUrls, medicalHistory: $medicalHistory, censusData: $censusData, metadata: $metadata, images: $images)';
   }
 
   @override
@@ -496,6 +528,8 @@ class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
       ..add(DiagnosticsProperty('estimatedAge', estimatedAge))
       ..add(DiagnosticsProperty('weight', weight))
       ..add(DiagnosticsProperty('microchipNumber', microchipNumber))
+      ..add(DiagnosticsProperty('reproductiveStatus', reproductiveStatus))
+      ..add(DiagnosticsProperty('size', size))
       ..add(DiagnosticsProperty('registrationDate', registrationDate))
       ..add(DiagnosticsProperty('lastUpdated', lastUpdated))
       ..add(DiagnosticsProperty('isActive', isActive))
@@ -526,6 +560,9 @@ class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
             (identical(other.weight, weight) || other.weight == weight) &&
             (identical(other.microchipNumber, microchipNumber) ||
                 other.microchipNumber == microchipNumber) &&
+            (identical(other.reproductiveStatus, reproductiveStatus) ||
+                other.reproductiveStatus == reproductiveStatus) &&
+            (identical(other.size, size) || other.size == size) &&
             (identical(other.registrationDate, registrationDate) ||
                 other.registrationDate == registrationDate) &&
             (identical(other.lastUpdated, lastUpdated) ||
@@ -560,6 +597,8 @@ class _$AnimalImpl extends _Animal with DiagnosticableTreeMixin {
         estimatedAge,
         weight,
         microchipNumber,
+        reproductiveStatus,
+        size,
         registrationDate,
         lastUpdated,
         isActive,
@@ -594,6 +633,8 @@ abstract class _Animal extends Animal {
           @JsonKey(fromJson: _parseEstimatedAge) final int? estimatedAge,
           @JsonKey(fromJson: _parseWeight) final double? weight,
           final String? microchipNumber,
+          final String? reproductiveStatus,
+          final String? size,
           @JsonKey(fromJson: _parseRequiredDateTime)
           required final DateTime registrationDate,
           @JsonKey(fromJson: _parseRequiredDateTime)
@@ -631,6 +672,10 @@ abstract class _Animal extends Animal {
   double? get weight;
   @override
   String? get microchipNumber;
+  @override
+  String? get reproductiveStatus;
+  @override
+  String? get size;
   @override
   @JsonKey(fromJson: _parseRequiredDateTime)
   DateTime get registrationDate;
