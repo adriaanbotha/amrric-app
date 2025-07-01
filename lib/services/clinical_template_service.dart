@@ -222,10 +222,8 @@ class ClinicalTemplateService {
             debugPrint('✅ Successfully parsed template: ${template.name}');
           } catch (e) {
             debugPrint('⚠️ Error parsing template $templateId: $e');
-            // Delete malformed templates
-            debugPrint('🗑️ Deleting malformed template: $templateId');
-            await UpstashConfig.redis.del([templateKey]);
-            await UpstashConfig.redis.srem(_templatesIndexKey, [templateId]);
+            // Don't delete templates during debugging - just skip them
+            debugPrint('⏭️ Skipping template due to parsing error (not deleting)');
           }
         } else {
           debugPrint('⚠️ No data found for template $templateId');
@@ -407,24 +405,26 @@ class ClinicalTemplateService {
       } else if (key == 'createdAt' || key == 'lastUpdated') {
         try {
           if (value is DateTime) {
-            parsedData[key] = value;
+            // Convert DateTime back to ISO string for fromJson
+            parsedData[key] = value.toIso8601String();
           } else if (value is String) {
-            parsedData[key] = DateTime.parse(value);
+            // Keep as string (what fromJson expects)
+            parsedData[key] = value;
           } else {
             // Handle other types by converting to string first
-            parsedData[key] = DateTime.parse(value.toString());
+            parsedData[key] = DateTime.parse(value.toString()).toIso8601String();
           }
         } catch (e) {
           debugPrint('⚠️ Error parsing DateTime $key: $e, value: $value (type: ${value.runtimeType})');
           // Try a more flexible approach
           try {
             if (value.toString().contains('T')) {
-              parsedData[key] = DateTime.parse(value.toString());
+              parsedData[key] = value.toString(); // Keep as string
             } else {
-              parsedData[key] = DateTime.now();
+              parsedData[key] = DateTime.now().toIso8601String();
             }
           } catch (e2) {
-            parsedData[key] = DateTime.now();
+            parsedData[key] = DateTime.now().toIso8601String();
           }
         }
       } else {
