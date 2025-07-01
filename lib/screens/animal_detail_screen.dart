@@ -95,6 +95,8 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
           builder: (context) => ClinicalNotesScreen(
             animalId: widget.animalId,
             animalName: _animal!.name ?? widget.animalName,
+            animalSpecies: _animal?.species,
+            animalSex: _animal?.sex,
           ),
         ),
       );

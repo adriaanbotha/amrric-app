@@ -3,16 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/services/animal_records_service.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/providers/animal_records_provider.dart';
+import 'package:amrric_app/providers/clinical_template_provider.dart';
+import 'package:amrric_app/models/clinical_note_template.dart';
 import 'package:amrric_app/models/user.dart';
 
 class ClinicalNotesScreen extends ConsumerStatefulWidget {
   final String animalId;
   final String animalName;
+  final String? animalSpecies;
+  final String? animalSex;
 
   const ClinicalNotesScreen({
     Key? key,
     required this.animalId,
     required this.animalName,
+    this.animalSpecies,
+    this.animalSex,
   }) : super(key: key);
 
   @override
@@ -237,6 +243,142 @@ class _ClinicalNotesScreenState extends ConsumerState<ClinicalNotesScreen> with 
     _loadExistingClinicalNotes();
   }
 
+  Future<void> _showTemplateSelector(BuildContext context) async {
+    if (widget.animalSpecies == null || widget.animalSex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Animal species and gender must be set to use templates'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final animalData = {
+        'species': widget.animalSpecies!,
+        'sex': widget.animalSex!,
+      };
+      
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Loading templates...'),
+            ],
+          ),
+        ),
+      );
+      
+      final templates = await ref.read(animalTemplatesProvider(animalData).future);
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      if (templates.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No templates available for this animal type'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      showDialog(
+        context: context,
+        builder: (context) => _TemplateSelectorDialog(
+          templates: templates,
+          onTemplateSelected: _applyTemplate,
+        ),
+      );
+      
+    } catch (e) {
+      debugPrint('❌ Error showing template selector: $e');
+      // Close loading dialog if still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading templates: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _applyTemplate(ClinicalNoteTemplate template) async {
+    try {
+      debugPrint('🌟 Applying template: ${template.name}');
+      
+      // Add all problems from template
+      for (final problem in template.problems) {
+        setState(() {
+          addedProblems.add(_ProblemEntry(
+            category: problem.category,
+            value: problem.value,
+            notes: problem.notes,
+          ));
+        });
+        await _saveClinicalNote('problem', problem.category, problem.value, problem.notes);
+      }
+      
+      // Add all procedures from template
+      for (final procedure in template.procedures) {
+        setState(() {
+          addedProcedures.add(_ProcedureEntry(
+            category: procedure.category,
+            value: procedure.value,
+            notes: procedure.notes,
+          ));
+        });
+        await _saveClinicalNote('procedure', procedure.category, procedure.value, procedure.notes);
+      }
+      
+      // Add all treatments from template
+      for (final treatment in template.treatments) {
+        setState(() {
+          addedTreatments.add(_TreatmentEntry(
+            category: treatment.category,
+            value: treatment.value,
+            notes: treatment.notes,
+          ));
+        });
+        await _saveClinicalNote('treatment', treatment.category, treatment.value, treatment.notes);
+      }
+      
+      final totalItems = template.problems.length + template.procedures.length + template.treatments.length;
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Applied template "${template.name}" - $totalItems items added'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      
+      debugPrint('✅ Template applied successfully');
+    } catch (e) {
+      debugPrint('❌ Error applying template: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error applying template: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteClinicalNote(String? recordId, String type, String category, String value) async {
     if (recordId == null) {
       debugPrint('⚠️ Cannot delete record: no record ID');
@@ -337,6 +479,13 @@ class _ClinicalNotesScreenState extends ConsumerState<ClinicalNotesScreen> with 
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: () => _showTemplateSelector(context),
+            icon: const Icon(Icons.star, color: Colors.white),
+            tooltip: 'Apply Template',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -804,6 +953,110 @@ class _PickerDialogState extends State<_PickerDialog> {
           child: const Text('Add', style: TextStyle(color: Colors.white)),
         ),
       ],
+    );
+  }
+}
+
+// Template selector dialog
+class _TemplateSelectorDialog extends StatefulWidget {
+  final List<ClinicalNoteTemplate> templates;
+  final Function(ClinicalNoteTemplate) onTemplateSelected;
+
+  const _TemplateSelectorDialog({
+    required this.templates,
+    required this.onTemplateSelected,
+  });
+
+  @override
+  State<_TemplateSelectorDialog> createState() => _TemplateSelectorDialogState();
+}
+
+class _TemplateSelectorDialogState extends State<_TemplateSelectorDialog> {
+  String filter = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredTemplates = widget.templates
+        .where((template) => template.name.toLowerCase().contains(filter.toLowerCase()) ||
+                             template.appliesTo.toLowerCase().contains(filter.toLowerCase()))
+        .toList();
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.star, color: Colors.orange),
+          const SizedBox(width: 8),
+          const Text('Select Template to Add'),
+          const Spacer(),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search templates...',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (val) => setState(() => filter = val),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 400,
+            width: 400,
+            child: ListView.builder(
+              itemCount: filteredTemplates.length,
+              itemBuilder: (context, index) {
+                final template = filteredTemplates[index];
+                final totalItems = template.problems.length + 
+                                 template.procedures.length + 
+                                 template.treatments.length;
+                
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.orange,
+                      child: Icon(Icons.medical_services, color: Colors.white, size: 20),
+                    ),
+                    title: Text(
+                      template.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(template.appliesTo),
+                        Text(
+                          '$totalItems items',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.public, color: Colors.grey, size: 16),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_ios, size: 16),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      widget.onTemplateSelected(template);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 } 

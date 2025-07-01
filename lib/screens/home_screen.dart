@@ -134,6 +134,14 @@ class HomeScreen extends ConsumerWidget {
                   );
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.settings_applications),
+                title: const Text('Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/settings');
+                },
+              ),
               const Divider(),
             ],
             // Veterinary User Section
@@ -152,6 +160,14 @@ class HomeScreen extends ConsumerWidget {
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.pushNamed(context, '/medications');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.medical_services),
+                title: const Text('Clinical Templates'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/clinical-templates');
                 },
               ),
               ListTile(
@@ -339,6 +355,12 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
         ),
+        _buildMenuCard(
+          context,
+          'Settings',
+          Icons.settings_applications,
+          () => Navigator.pushNamed(context, '/settings'),
+        ),
       ],
     );
   }
@@ -420,6 +442,12 @@ class HomeScreen extends ConsumerWidget {
                     builder: (context) => const CouncilSelectionScreen(),
                   ),
                 ),
+              ),
+              _buildMenuCard(
+                context,
+                'Clinical Templates',
+                Icons.medical_services,
+                () => Navigator.pushNamed(context, '/clinical-templates'),
               ),
               _buildMenuCard(
                 context,
