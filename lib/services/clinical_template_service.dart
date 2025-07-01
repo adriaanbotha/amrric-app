@@ -370,23 +370,34 @@ class ClinicalTemplateService {
         return [];
       }
       
-      final jsonString = value.toString();
-      final List<dynamic> jsonList = jsonDecode(jsonString);
+      List<dynamic> itemList;
       
-      return jsonList.map((item) {
+      // Check if Redis returned a parsed List directly
+      if (value is List) {
+        debugPrint('📋 Value is already a List with ${value.length} items');
+        itemList = value;
+      } else {
+        // Try to parse as JSON string
+        final jsonString = value.toString();
+        debugPrint('📋 Parsing JSON string: $jsonString');
+        itemList = jsonDecode(jsonString);
+      }
+      
+      return itemList.map((item) {
         if (item is Map<String, dynamic>) {
           return TemplateItem.fromJson(item);
         } else if (item is Map) {
           // Convert Map<dynamic, dynamic> to Map<String, dynamic>
           final stringMap = <String, dynamic>{};
           item.forEach((k, v) => stringMap[k.toString()] = v);
+          debugPrint('🔧 Converted map: $stringMap');
           return TemplateItem.fromJson(stringMap);
         } else {
           throw FormatException('Invalid item format: $item');
         }
       }).toList();
     } catch (e) {
-      debugPrint('⚠️ Error parsing template item list: $e, value: $value');
+      debugPrint('⚠️ Error parsing template item list: $e, value: $value (type: ${value.runtimeType})');
       return [];
     }
   }
