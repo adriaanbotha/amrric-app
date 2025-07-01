@@ -146,8 +146,8 @@ class ClinicalTemplateService {
       debugPrint('📖 Loading all clinical templates');
       debugPrint('🔑 Using index key: $_templatesIndexKey');
       
-      // Clean up malformed templates first - temporarily disabled
-      // await cleanupMalformedTemplates();
+      // Clean up malformed templates first
+      await cleanupMalformedTemplates();
       
       final templateIds = await UpstashConfig.redis.smembers(_templatesIndexKey);
       debugPrint('🔍 Found ${templateIds?.length ?? 0} template IDs: $templateIds');
@@ -318,21 +318,43 @@ class ClinicalTemplateService {
             parsedData[key] = <TemplateItem>[];
           } else {
             debugPrint('🔍 Parsing $key with value: $value');
-            final jsonString = value.toString();
             
-            // Check if the JSON is malformed (missing quotes)
-            if (!jsonString.startsWith('[{\"') && jsonString.contains('{category:')) {
-              debugPrint('⚠️ Detected malformed JSON for $key: $jsonString');
-              throw FormatException('Malformed JSON detected');
+            List<dynamic> list;
+            if (value is List) {
+              // Already parsed as a List (Redis sometimes returns parsed objects)
+              list = value;
+            } else {
+              // Try to parse as JSON string
+              final jsonString = value.toString();
+              try {
+                list = jsonDecode(jsonString) as List;
+              } catch (e) {
+                debugPrint('⚠️ Failed to parse as JSON, trying as raw data: $e');
+                // If JSON parsing fails, treat it as already parsed data
+                if (value is List) {
+                  list = value;
+                } else {
+                  throw FormatException('Cannot parse $key data: $value');
+                }
+              }
             }
-            
-            final list = jsonDecode(jsonString) as List;
             debugPrint('🔍 Decoded list for $key: $list');
             
             parsedData[key] = list.map((item) {
-              if (item is Map<String, dynamic>) {
-                debugPrint('🔍 Creating TemplateItem from: $item');
-                return TemplateItem.fromJson(item);
+              if (item is Map) {
+                // Convert to Map<String, dynamic> if needed
+                final Map<String, dynamic> itemMap;
+                if (item is Map<String, dynamic>) {
+                  itemMap = item;
+                } else {
+                  // Convert from Map<dynamic, dynamic> to Map<String, dynamic>
+                  itemMap = {};
+                  item.forEach((k, v) {
+                    itemMap[k.toString()] = v;
+                  });
+                }
+                debugPrint('🔍 Creating TemplateItem from: $itemMap');
+                return TemplateItem.fromJson(itemMap);
               } else {
                 debugPrint('⚠️ Invalid item format in $key: $item (type: ${item.runtimeType})');
                 return null;
@@ -359,7 +381,16 @@ class ClinicalTemplateService {
           }
         } catch (e) {
           debugPrint('⚠️ Error parsing DateTime $key: $e, value: $value (type: ${value.runtimeType})');
-          parsedData[key] = DateTime.now();
+          // Try a more flexible approach
+          try {
+            if (value.toString().contains('T')) {
+              parsedData[key] = DateTime.parse(value.toString());
+            } else {
+              parsedData[key] = DateTime.now();
+            }
+          } catch (e2) {
+            parsedData[key] = DateTime.now();
+          }
         }
       } else {
         parsedData[key] = value.toString();
