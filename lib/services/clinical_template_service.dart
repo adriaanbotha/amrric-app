@@ -181,8 +181,8 @@ class ClinicalTemplateService {
       debugPrint('📖 Loading all clinical templates');
       debugPrint('🔑 Using index key: $_templatesIndexKey');
       
-      // Clean up malformed templates first
-      await cleanupMalformedTemplates();
+      // Clean up malformed templates first - disabled while debugging
+      // await cleanupMalformedTemplates();
       
       final templateIds = await UpstashConfig.redis.smembers(_templatesIndexKey);
       debugPrint('🔍 Found ${templateIds?.length ?? 0} template IDs: $templateIds');
