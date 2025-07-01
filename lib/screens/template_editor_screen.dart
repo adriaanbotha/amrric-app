@@ -120,17 +120,22 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
         backgroundColor: Colors.orange.shade400,
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white),
-                 actions: [
-           IconButton(
-             icon: _isSaving ? const SizedBox(
-               width: 20,
-               height: 20,
-               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-             ) : const Icon(Icons.save),
-             tooltip: 'Save Template',
-             onPressed: _isSaving ? null : _saveTemplate,
-           ),
-         ],
+                         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Clear All Templates (Debug)',
+            onPressed: () => _clearAllTemplates(),
+          ),
+          IconButton(
+            icon: _isSaving ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ) : const Icon(Icons.save),
+            tooltip: 'Save Template',
+            onPressed: _isSaving ? null : _saveTemplate,
+          ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -599,6 +604,54 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
       final item = _treatments.removeAt(oldIndex);
       _treatments.insert(newIndex, item);
     });
+  }
+
+  Future<void> _clearAllTemplates() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Templates'),
+        content: const Text('This will delete ALL clinical templates. This action cannot be undone. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final templateService = ref.read(clinicalTemplateServiceProvider);
+        await templateService.clearAllTemplates();
+        
+        // Refresh providers
+        ref.invalidate(allClinicalTemplatesProvider);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('All templates cleared successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error clearing templates: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<String?> _showNotesDialog(String itemName, String currentNotes) async {

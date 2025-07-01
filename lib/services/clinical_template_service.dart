@@ -106,67 +106,36 @@ class ClinicalTemplateService {
   Future<String> saveTemplate(ClinicalNoteTemplate template) async {
     try {
       debugPrint('💾 Saving clinical template: ${template.name}');
-      debugPrint('📊 Template has ${template.problems.length} problems, ${template.procedures.length} procedures, ${template.treatments.length} treatments');
       
-      final templateData = template.toJson();
       final key = '$_templatesPrefix:${template.id}';
       
-      debugPrint('🔑 Template key: $key');
-      debugPrint('📄 Template data keys: ${templateData.keys}');
+      // Convert everything to JSON strings for consistent storage
+      final stringData = <String, String>{
+        'id': template.id,
+        'name': template.name,
+        'appliesTo': template.appliesTo,
+        'author': template.author,
+        'createdAt': template.createdAt.toIso8601String(),
+        'lastUpdated': template.lastUpdated.toIso8601String(),
+        'problems': jsonEncode(template.problems.map((e) => e.toJson()).toList()),
+        'procedures': jsonEncode(template.procedures.map((e) => e.toJson()).toList()),
+        'treatments': jsonEncode(template.treatments.map((e) => e.toJson()).toList()),
+      };
       
-      // Convert template data to string format for Redis with explicit handling
-      final stringData = <String, String>{};
-      templateData.forEach((key, value) {
-        if (key == 'problems' || key == 'procedures' || key == 'treatments') {
-          // Handle template item lists specifically
-          if (value is List<TemplateItem>) {
-            final jsonList = value.map((item) => item.toJson()).toList();
-            final jsonString = jsonEncode(jsonList);
-            stringData[key] = jsonString;
-          } else if (value is List) {
-            // Already serialized by toJson() 
-            final jsonString = jsonEncode(value);
-            stringData[key] = jsonString;
-          } else if (value is String) {
-            // Already a JSON string
-            stringData[key] = value;
-          } else {
-            // Fallback
-            stringData[key] = jsonEncode(value);
-          }
-          debugPrint('🔢 Serialized $key: ${stringData[key]}');
-        } else if (key == 'createdAt' || key == 'lastUpdated') {
-          // Handle DateTime fields
-          if (value is DateTime) {
-            stringData[key] = value.toIso8601String();
-          } else if (value is String) {
-            // Already serialized by toJson()
-            stringData[key] = value;
-          } else {
-            // Try to parse if it's another type
-            stringData[key] = DateTime.parse(value.toString()).toIso8601String();
-          }
-          debugPrint('📅 Serialized $key: ${stringData[key]}');
-        } else {
-          stringData[key] = value.toString();
-        }
-      });
+      // Add description if present
+      if (template.description != null) {
+        stringData['description'] = template.description!;
+      }
       
-      debugPrint('🔢 String data keys: ${stringData.keys}');
+      debugPrint('✅ Prepared data for Redis storage');
       
       // Save template to Redis
       await UpstashConfig.redis.hset(key, stringData);
-      debugPrint('✅ Template data saved to Redis');
       
       // Add to index
       await UpstashConfig.redis.sadd(_templatesIndexKey, [template.id]);
-      debugPrint('✅ Template ID added to index');
       
-      // Verify save by reading back
-      final savedData = await UpstashConfig.redis.hgetall(key);
-      debugPrint('🔍 Verification - saved data keys: ${savedData?.keys}');
-      
-      debugPrint('✅ Template saved successfully: ${template.id}');
+      debugPrint('✅ Template saved: ${template.id}');
       return template.id;
     } catch (e, stackTrace) {
       debugPrint('❌ Error saving template: $e');
@@ -319,6 +288,32 @@ class ClinicalTemplateService {
     return 'template_${sanitizedName}_$timestamp';
   }
 
+  /// Clear all templates - useful for debugging
+  Future<void> clearAllTemplates() async {
+    try {
+      debugPrint('🧹 Clearing all clinical templates...');
+      
+      // Get all template keys
+      final templateKeys = await UpstashConfig.redis.keys('$_templatesPrefix:*');
+      debugPrint('🔍 Found ${templateKeys?.length ?? 0} template keys to delete');
+      
+      if (templateKeys != null && templateKeys.isNotEmpty) {
+        // Delete all template data
+        await UpstashConfig.redis.del(templateKeys);
+        debugPrint('🗑️ Deleted ${templateKeys.length} template entries');
+      }
+      
+      // Clear the index
+      await UpstashConfig.redis.del([_templatesIndexKey]);
+      debugPrint('🗑️ Cleared template index');
+      
+      debugPrint('✅ All templates cleared successfully');
+    } catch (e) {
+      debugPrint('❌ Error clearing templates: $e');
+      rethrow;
+    }
+  }
+
   /// Helper method to convert values to string for Redis storage
   String _convertToString(dynamic value) {
     if (value is List) {
@@ -341,102 +336,58 @@ class ClinicalTemplateService {
 
   /// Helper method to parse template data from Redis
   ClinicalNoteTemplate _parseTemplate(Map<String, dynamic> data) {
-    // Parse JSON strings back to objects
-    final parsedData = <String, dynamic>{};
-    
-    data.forEach((key, value) {
-      if (key == 'problems' || key == 'procedures' || key == 'treatments') {
-        try {
-          if (value == null || value.toString().isEmpty || value.toString() == 'null') {
-            parsedData[key] = <TemplateItem>[];
-          } else {
-            debugPrint('🔍 Parsing $key with value: $value');
-            
-            List<dynamic> list;
-            if (value is List) {
-              // Already parsed as a List (Redis sometimes returns parsed objects)
-              list = value;
-            } else {
-              // Try to parse as JSON string
-              final jsonString = value.toString();
-              try {
-                list = jsonDecode(jsonString) as List;
-              } catch (e) {
-                debugPrint('⚠️ Failed to parse as JSON, trying as raw data: $e');
-                // If JSON parsing fails, treat it as already parsed data
-                if (value is List) {
-                  list = value;
-                } else {
-                  throw FormatException('Cannot parse $key data: $value');
-                }
-              }
-            }
-            debugPrint('🔍 Decoded list for $key: $list');
-            
-            parsedData[key] = list.map((item) {
-              if (item is Map) {
-                // Convert to Map<String, dynamic> if needed
-                final Map<String, dynamic> itemMap;
-                if (item is Map<String, dynamic>) {
-                  itemMap = item;
-                } else {
-                  // Convert from Map<dynamic, dynamic> to Map<String, dynamic>
-                  itemMap = {};
-                  item.forEach((k, v) {
-                    itemMap[k.toString()] = v;
-                  });
-                }
-                debugPrint('🔍 Creating TemplateItem from: $itemMap');
-                return TemplateItem.fromJson(itemMap);
-              } else {
-                debugPrint('⚠️ Invalid item format in $key: $item (type: ${item.runtimeType})');
-                return null;
-              }
-            }).where((item) => item != null).cast<TemplateItem>().toList();
-            
-            debugPrint('✅ Successfully parsed ${(parsedData[key] as List).length} items for $key');
-          }
-        } catch (e, stack) {
-          debugPrint('⚠️ Error parsing $key: $e');
-          debugPrint('⚠️ Stack trace: $stack');
-          debugPrint('⚠️ Value was: $value (type: ${value.runtimeType})');
-          parsedData[key] = <TemplateItem>[];
-        }
-      } else if (key == 'createdAt' || key == 'lastUpdated') {
-        try {
-          if (value is DateTime) {
-            // Convert DateTime back to ISO string for fromJson
-            parsedData[key] = value.toIso8601String();
-          } else if (value is String) {
-            // Keep as string (what fromJson expects)
-            parsedData[key] = value;
-          } else {
-            // Handle other types by converting to string first
-            parsedData[key] = DateTime.parse(value.toString()).toIso8601String();
-          }
-        } catch (e) {
-          debugPrint('⚠️ Error parsing DateTime $key: $e, value: $value (type: ${value.runtimeType})');
-          // Try a more flexible approach
-          try {
-            if (value.toString().contains('T')) {
-              parsedData[key] = value.toString(); // Keep as string
-            } else {
-              parsedData[key] = DateTime.now().toIso8601String();
-            }
-          } catch (e2) {
-            parsedData[key] = DateTime.now().toIso8601String();
-          }
-        }
-      } else {
-        parsedData[key] = value.toString();
+    try {
+      debugPrint('🔍 Parsing template with keys: ${data.keys}');
+      
+      // Parse the list fields from JSON strings
+      final problems = _parseTemplateItemList(data['problems'] ?? '[]');
+      final procedures = _parseTemplateItemList(data['procedures'] ?? '[]');
+      final treatments = _parseTemplateItemList(data['treatments'] ?? '[]');
+      
+      return ClinicalNoteTemplate(
+        id: data['id']?.toString() ?? '',
+        name: data['name']?.toString() ?? '',
+        appliesTo: data['appliesTo']?.toString() ?? 'All',
+        author: data['author']?.toString() ?? 'Unknown',
+        createdAt: DateTime.parse(data['createdAt']?.toString() ?? DateTime.now().toIso8601String()),
+        lastUpdated: DateTime.parse(data['lastUpdated']?.toString() ?? DateTime.now().toIso8601String()),
+        problems: problems,
+        procedures: procedures,
+        treatments: treatments,
+        description: data['description']?.toString(),
+      );
+    } catch (e, stack) {
+      debugPrint('❌ Error parsing template: $e');
+      debugPrint('Stack trace: $stack');
+      rethrow;
+    }
+  }
+  
+  /// Helper to parse template item lists from JSON
+  List<TemplateItem> _parseTemplateItemList(dynamic value) {
+    try {
+      if (value == null || value.toString().isEmpty || value.toString() == '[]') {
+        return [];
       }
-    });
-    
-    debugPrint('📋 Parsed template data keys: ${parsedData.keys}');
-    debugPrint('📋 Problems count: ${(parsedData['problems'] as List?)?.length ?? 0}');
-    debugPrint('📋 Procedures count: ${(parsedData['procedures'] as List?)?.length ?? 0}');
-    debugPrint('📋 Treatments count: ${(parsedData['treatments'] as List?)?.length ?? 0}');
-    
-    return ClinicalNoteTemplate.fromJson(parsedData);
+      
+      final jsonString = value.toString();
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      
+      return jsonList.map((item) {
+        if (item is Map<String, dynamic>) {
+          return TemplateItem.fromJson(item);
+        } else if (item is Map) {
+          // Convert Map<dynamic, dynamic> to Map<String, dynamic>
+          final stringMap = <String, dynamic>{};
+          item.forEach((k, v) => stringMap[k.toString()] = v);
+          return TemplateItem.fromJson(stringMap);
+        } else {
+          throw FormatException('Invalid item format: $item');
+        }
+      }).toList();
+    } catch (e) {
+      debugPrint('⚠️ Error parsing template item list: $e, value: $value');
+      return [];
+    }
   }
 } 
