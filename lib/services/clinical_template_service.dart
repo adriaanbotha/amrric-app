@@ -25,29 +25,64 @@ class ClinicalTemplateService {
             // Check if template data is malformed
             bool isMalformed = false;
             
+            debugPrint('🔍 Cleanup checking template $templateId with data keys: ${data.keys}');
+            
             for (final field in ['problems', 'procedures', 'treatments']) {
-              final value = data[field]?.toString() ?? '';
-              if (value.isNotEmpty) {
+              final value = data[field];
+              debugPrint('🔍 Cleanup checking field $field with value: $value (type: ${value.runtimeType})');
+              
+              if (value != null) {
                 try {
-                  // Try to parse the JSON to see if it's valid
-                  final decoded = jsonDecode(value);
-                  if (decoded is! List) {
+                  List<dynamic> listData;
+                  
+                  if (value is List) {
+                    // Already a List - this is fine
+                    listData = value;
+                    debugPrint('✅ Field $field is already a List with ${listData.length} items');
+                  } else if (value is String) {
+                    // Try to parse JSON string
+                    if (value.isEmpty || value == '[]') {
+                      listData = [];
+                    } else {
+                      listData = jsonDecode(value) as List;
+                    }
+                    debugPrint('✅ Field $field parsed from JSON string to List with ${listData.length} items');
+                  } else {
+                    debugPrint('❌ Field $field has unexpected type: ${value.runtimeType}');
                     isMalformed = true;
                     break;
                   }
-                  // Check if it contains malformed objects (old format)
-                  for (final item in decoded) {
-                    if (item is Map && item.containsKey('category') && item['category'] is! String) {
+                  
+                  // Check each item in the list
+                  for (final item in listData) {
+                    if (item is Map) {
+                      // Check if it has the required fields
+                      if (!item.containsKey('category') || !item.containsKey('value')) {
+                        debugPrint('❌ Item missing required fields: $item');
+                        isMalformed = true;
+                        break;
+                      }
+                    } else if (item != null) {
+                      debugPrint('❌ Non-map item found: $item (type: ${item.runtimeType})');
                       isMalformed = true;
                       break;
                     }
                   }
+                  
+                  if (isMalformed) break;
+                  
                 } catch (e) {
-                  // If we can't parse it as JSON, it's malformed
+                  debugPrint('❌ Error processing field $field: $e');
                   isMalformed = true;
                   break;
                 }
               }
+            }
+            
+            if (isMalformed) {
+              debugPrint('🗑️ Template $templateId marked as malformed');
+            } else {
+              debugPrint('✅ Template $templateId passed cleanup validation');
             }
             
             if (isMalformed) {
