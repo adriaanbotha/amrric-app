@@ -27,10 +27,26 @@ class ClinicalTemplateService {
             
             for (final field in ['problems', 'procedures', 'treatments']) {
               final value = data[field]?.toString() ?? '';
-              if (value.isNotEmpty && !value.startsWith('[{\"')) {
-                // This is malformed JSON (missing quotes)
-                isMalformed = true;
-                break;
+              if (value.isNotEmpty) {
+                try {
+                  // Try to parse the JSON to see if it's valid
+                  final decoded = jsonDecode(value);
+                  if (decoded is! List) {
+                    isMalformed = true;
+                    break;
+                  }
+                  // Check if it contains malformed objects (old format)
+                  for (final item in decoded) {
+                    if (item is Map && item.containsKey('category') && item['category'] is! String) {
+                      isMalformed = true;
+                      break;
+                    }
+                  }
+                } catch (e) {
+                  // If we can't parse it as JSON, it's malformed
+                  isMalformed = true;
+                  break;
+                }
               }
             }
             
@@ -68,15 +84,33 @@ class ClinicalTemplateService {
       templateData.forEach((key, value) {
         if (key == 'problems' || key == 'procedures' || key == 'treatments') {
           // Handle template item lists specifically
-          final items = value as List<TemplateItem>;
-          final jsonList = items.map((item) => item.toJson()).toList();
-          final jsonString = jsonEncode(jsonList);
-          stringData[key] = jsonString;
-          debugPrint('🔢 Serialized $key: $jsonString');
+          if (value is List<TemplateItem>) {
+            final jsonList = value.map((item) => item.toJson()).toList();
+            final jsonString = jsonEncode(jsonList);
+            stringData[key] = jsonString;
+          } else if (value is List) {
+            // Already serialized by toJson() 
+            final jsonString = jsonEncode(value);
+            stringData[key] = jsonString;
+          } else if (value is String) {
+            // Already a JSON string
+            stringData[key] = value;
+          } else {
+            // Fallback
+            stringData[key] = jsonEncode(value);
+          }
+          debugPrint('🔢 Serialized $key: ${stringData[key]}');
         } else if (key == 'createdAt' || key == 'lastUpdated') {
           // Handle DateTime fields
-          final dateTime = value as DateTime;
-          stringData[key] = dateTime.toIso8601String();
+          if (value is DateTime) {
+            stringData[key] = value.toIso8601String();
+          } else if (value is String) {
+            // Already serialized by toJson()
+            stringData[key] = value;
+          } else {
+            // Try to parse if it's another type
+            stringData[key] = DateTime.parse(value.toString()).toIso8601String();
+          }
           debugPrint('📅 Serialized $key: ${stringData[key]}');
         } else {
           stringData[key] = value.toString();
@@ -112,8 +146,8 @@ class ClinicalTemplateService {
       debugPrint('📖 Loading all clinical templates');
       debugPrint('🔑 Using index key: $_templatesIndexKey');
       
-      // Clean up malformed templates first
-      await cleanupMalformedTemplates();
+      // Clean up malformed templates first - temporarily disabled
+      // await cleanupMalformedTemplates();
       
       final templateIds = await UpstashConfig.redis.smembers(_templatesIndexKey);
       debugPrint('🔍 Found ${templateIds?.length ?? 0} template IDs: $templateIds');

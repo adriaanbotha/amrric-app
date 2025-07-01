@@ -9,6 +9,7 @@ import 'package:amrric_app/screens/admin/animal_management_screen.dart';
 import 'package:amrric_app/screens/medication_screen.dart';
 import 'package:amrric_app/screens/reports_screen.dart';
 import 'package:amrric_app/screens/settings_screen.dart';
+import 'package:amrric_app/screens/clinical_templates_screen.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/services/council_service.dart';
 import 'package:amrric_app/services/location_service.dart';
@@ -167,6 +168,11 @@ class _AmrricAppState extends ConsumerState<AmrricApp> {
           allowedRoles: [UserRole.veterinaryUser],
           routeName: '/medications',
           child: MedicationScreen(),
+        ),
+        '/clinical-templates': (context) => RoleGuard(
+          allowedRoles: [UserRole.veterinaryUser],
+          routeName: '/clinical-templates',
+          child: ClinicalTemplatesScreen(),
         ),
         '/reports': (context) => ReportsScreen(),
         '/settings': (context) => SettingsScreen(),
