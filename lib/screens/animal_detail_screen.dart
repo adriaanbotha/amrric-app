@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/models/animal.dart';
 import 'package:amrric_app/models/user.dart';
+import 'package:amrric_app/models/house.dart';
 import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/services/animal_records_service.dart';
+import 'package:amrric_app/services/house_service.dart';
 import 'package:amrric_app/providers/animal_records_provider.dart';
+import 'package:amrric_app/providers/house_provider.dart';
 import 'package:amrric_app/screens/clinical_notes_screen.dart';
+import 'package:amrric_app/widgets/animal_photo_gallery.dart';
+import 'package:amrric_app/services/photo_sync_service.dart';
+import 'package:amrric_app/config/upstash_config.dart';
+import 'package:amrric_app/utils/permission_helper.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class AnimalDetailScreen extends ConsumerStatefulWidget {
   final String animalId;
@@ -27,6 +35,25 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   bool _isLoading = true;
   String? _error;
   User? _currentUser;
+  PhotoSyncService? _photoSyncService;
+  bool _photoSyncServiceReady = false;
+  
+  // Form-related state
+  final _formKey = GlobalKey<FormState>();
+  bool _isEditMode = false;
+  late TextEditingController _nameController;
+  late TextEditingController _speciesController;
+  late TextEditingController _breedController;
+  late TextEditingController _colorController;
+  late TextEditingController _microchipController;
+  late TextEditingController _weightController;
+  String _sex = 'Male';
+  int _estimatedAge = 0;
+  bool _isActive = true;
+  List<String> _photoUrls = [];
+  String? _selectedHouseId;
+  List<House> _houses = [];
+  bool _isLoadingHouses = true;
 
   // Dropdown options for specific fields
   static const List<String> _speciesOptions = ['Cat', 'Dog'];
@@ -46,7 +73,336 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _initControllers();
     _loadAnimalDetails();
+    _initPhotoSyncService();
+    _loadHouses();
+  }
+  
+  void _initControllers() {
+    _nameController = TextEditingController();
+    _speciesController = TextEditingController();
+    _breedController = TextEditingController();
+    _colorController = TextEditingController();
+    _microchipController = TextEditingController();
+    _weightController = TextEditingController();
+  }
+  
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _speciesController.dispose();
+    _breedController.dispose();
+    _colorController.dispose();
+    _microchipController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initPhotoSyncService() async {
+    final box = await Hive.openBox<Map<dynamic, dynamic>>('photos');
+    setState(() {
+      _photoSyncService = PhotoSyncService(UpstashConfig.redis, box);
+      _photoSyncServiceReady = true;
+    });
+  }
+  
+  Future<void> _loadHouses() async {
+    try {
+      final houseService = ref.read(houseServiceProvider);
+      final houses = await houseService.getHouses();
+      setState(() {
+        _houses = houses;
+        _isLoadingHouses = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading houses: $e');
+      setState(() {
+        _isLoadingHouses = false;
+      });
+    }
+  }
+  
+  void _populateControllers(Animal animal) {
+    _nameController.text = animal.name ?? '';
+    _speciesController.text = animal.species;
+    _breedController.text = animal.breed ?? '';
+    _colorController.text = animal.color ?? '';
+    _microchipController.text = animal.microchipNumber ?? '';
+    _weightController.text = animal.weight?.toString() ?? '';
+    _sex = animal.sex;
+    _estimatedAge = animal.estimatedAge ?? 0;
+    _isActive = animal.isActive ?? true;
+    _photoUrls = List<String>.from(animal.photoUrls);
+    _selectedHouseId = animal.houseId;
+  }
+  
+  Widget _buildAnimalForm() {
+    final authService = ref.watch(authServiceProvider);
+    final currentUser = _currentUser;
+    final isVetUser = currentUser?.role == UserRole.veterinaryUser;
+    final isCensusUser = currentUser?.role == UserRole.censusUser;
+    
+    if (_isEditMode) {
+      return _buildEditForm(isVetUser, isCensusUser);
+    } else {
+      return _buildViewContent();
+    }
+  }
+  
+  Widget _buildViewContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Status row with icon
+        Row(
+          children: [
+            Icon(
+              Icons.health_and_safety,
+              color: Colors.green,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text('Alive', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
+            const Spacer(),
+            Text(
+              _formatDate(_animal!.registrationDate),
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        
+        // Name (large display)
+        Text(
+          _animal!.name ?? widget.animalName,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        
+        // Owner field
+        _buildInfoRow('Owner', _animal!.ownerId ?? '', null),
+        const SizedBox(height: 8),
+        
+        // Gender
+        _buildInfoRow('Gender', _animal!.sex, null),
+        const SizedBox(height: 8),
+        
+        // Species
+        _buildInfoRow('Species', _animal!.species, null),
+        const SizedBox(height: 8),
+        
+        // Breed
+        _buildInfoRow('Breed', _animal!.breed ?? '', null),
+        const SizedBox(height: 8),
+        
+        // Repro status
+        _buildInfoRow('Repro', _animal!.reproductiveStatus ?? 'Unknown', null),
+        const SizedBox(height: 8),
+        
+        // Age
+        _buildInfoRow('Age', _getAgeDisplay(), null),
+        const SizedBox(height: 8),
+        
+        // Size
+        _buildInfoRow('Size', _animal!.size ?? 'Unknown', null),
+        const SizedBox(height: 8),
+        
+        // Weight
+        _buildInfoRow('Weight(kg)', _animal!.weight?.toString() ?? '', null),
+        const SizedBox(height: 8),
+        
+        // Microchip
+        _buildInfoRow('MC', _animal!.microchipNumber ?? '', null),
+        const SizedBox(height: 8),
+        
+        // Registration
+        _buildInfoRow('Registration', _formatDate(_animal!.registrationDate), null),
+        const SizedBox(height: 8),
+        
+        // Colour
+        _buildInfoRow('Colour', _animal!.color ?? '', null),
+      ],
+    );
+  }
+  
+  Widget _buildEditForm(bool isVetUser, bool isCensusUser) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Basic Information Section
+        const Text(
+          'Basic Information',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        
+        TextFormField(
+          controller: _nameController,
+          decoration: const InputDecoration(
+            labelText: 'Name (Optional)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        TextFormField(
+          controller: _speciesController,
+          decoration: const InputDecoration(
+            labelText: 'Species *',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter the species';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        if (!isCensusUser) ...[
+          TextFormField(
+            controller: _breedController,
+            decoration: const InputDecoration(
+              labelText: 'Breed',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        TextFormField(
+          controller: _colorController,
+          decoration: const InputDecoration(
+            labelText: 'Color/Markings',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        DropdownButtonFormField<String>(
+          value: _sex,
+          decoration: const InputDecoration(
+            labelText: 'Sex *',
+            border: OutlineInputBorder(),
+          ),
+          items: ['Male', 'Female'].map((sex) {
+            return DropdownMenuItem(
+              value: sex,
+              child: Text(sex),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _sex = value!;
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // House Selection
+        if (_isLoadingHouses)
+          const CircularProgressIndicator()
+        else
+          DropdownButtonFormField<String>(
+            value: _houses.any((house) => house.id == _selectedHouseId) ? _selectedHouseId : null,
+            decoration: const InputDecoration(
+              labelText: 'House *',
+              border: OutlineInputBorder(),
+            ),
+            items: _houses.map((house) {
+              return DropdownMenuItem(
+                value: house.id,
+                child: Text(house.fullAddress.isNotEmpty ? house.fullAddress : house.id),
+              );
+            }).toList(),
+            onChanged: (value) {
+              debugPrint('House selection changed to: $value');
+              setState(() {
+                _selectedHouseId = value;
+              });
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select a house';
+              }
+              return null;
+            },
+          ),
+        const SizedBox(height: 16),
+
+        // Advanced Information Section (Not for Census Users)
+        if (!isCensusUser) ...[
+          const Text(
+            'Advanced Information',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          TextFormField(
+            controller: _microchipController,
+            decoration: const InputDecoration(
+              labelText: 'Microchip Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          TextFormField(
+            controller: _weightController,
+            decoration: const InputDecoration(
+              labelText: 'Weight (kg)',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 16),
+
+          // Age Selector
+          Row(
+            children: [
+              const Text('Estimated Age: '),
+              Expanded(
+                child: Slider(
+                  value: _estimatedAge.toDouble(),
+                  min: 0,
+                  max: 20,
+                  divisions: 20,
+                  label: _estimatedAge.toString(),
+                  onChanged: (value) {
+                    setState(() {
+                      _estimatedAge = value.round();
+                    });
+                  },
+                ),
+              ),
+              Text('$_estimatedAge years'),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Status Section (Not for Census Users)
+        if (!isCensusUser) ...[
+          const Text(
+            'Status',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          SwitchListTile(
+            title: const Text('Active'),
+            value: _isActive,
+            onChanged: (value) {
+              setState(() {
+                _isActive = value;
+              });
+            },
+          ),
+        ],
+      ],
+    );
   }
 
   Future<void> _loadAnimalDetails() async {
@@ -71,6 +427,9 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
       }
       
       debugPrint('✅ Animal loaded: ${animal.name} - ${animal.species}');
+      
+      // Populate form controllers with animal data
+      _populateControllers(animal);
       
       setState(() {
         _animal = animal;
@@ -294,6 +653,68 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     );
   }
 
+  Future<void> _saveAnimal() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_animal == null || _selectedHouseId == null) return;
+
+    final authService = ref.read(authServiceProvider);
+    final currentUser = await authService.getCurrentUser();
+    
+    try {
+      // Only store file names in photoUrls
+      final photoFileNames = _photoUrls.map((p) => p.split('/').last).toList();
+      debugPrint('Saving animal with photoUrls: $photoFileNames');
+      
+      final updatedAnimal = Animal(
+        id: _animal!.id,
+        name: _nameController.text.isEmpty ? null : _nameController.text,
+        species: _speciesController.text,
+        breed: _breedController.text.isEmpty ? null : _breedController.text,
+        color: _colorController.text.isEmpty ? null : _colorController.text,
+        sex: _sex,
+        estimatedAge: _estimatedAge,
+        weight: double.tryParse(_weightController.text),
+        microchipNumber: _microchipController.text.isEmpty ? null : _microchipController.text,
+        registrationDate: _animal!.registrationDate,
+        lastUpdated: DateTime.now(),
+        isActive: _isActive,
+        houseId: _selectedHouseId!,
+        locationId: _animal!.locationId,
+        councilId: _animal!.councilId,
+        ownerId: _animal!.ownerId,
+        photoUrls: photoFileNames,
+        medicalHistory: _animal!.medicalHistory,
+        censusData: _animal!.censusData,
+        metadata: _animal!.metadata,
+      );
+
+      final animalService = ref.read(animalsProvider.notifier);
+      await animalService.updateAnimal(updatedAnimal);
+
+      // Sync photos after updating animal
+      if (_photoSyncServiceReady && _photoSyncService != null) {
+        await _photoSyncService!.syncPhotos();
+      }
+
+      if (!mounted) return;
+      
+      setState(() {
+        _animal = updatedAnimal;
+        _isEditMode = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Animal updated successfully')),
+      );
+    } catch (e) {
+      debugPrint('Error saving animal: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   Future<void> _updateAnimalField(String field, dynamic value) async {
     if (_animal == null || !mounted) return;
     
@@ -385,6 +806,30 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
             expandedHeight: 200,
             pinned: true,
             backgroundColor: Theme.of(context).primaryColor,
+            actions: [
+              IconButton(
+                icon: Icon(_isEditMode ? Icons.save : Icons.edit),
+                onPressed: () async {
+                  if (_isEditMode) {
+                    await _saveAnimal();
+                  } else {
+                    setState(() {
+                      _isEditMode = true;
+                    });
+                  }
+                },
+              ),
+              if (_isEditMode)
+                IconButton(
+                  icon: const Icon(Icons.cancel),
+                  onPressed: () {
+                    _populateControllers(_animal!); // Reset controllers
+                    setState(() {
+                      _isEditMode = false;
+                    });
+                  },
+                ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 _animal!.name ?? widget.animalName,
@@ -419,121 +864,60 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Status row with icon
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.health_and_safety,
-                            color: Colors.green,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text('Alive', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
-                          const Spacer(),
-                          Text(
-                            _formatDate(_animal!.registrationDate),
-                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Name (large display)
-                      Text(
-                        _animal!.name ?? widget.animalName,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Owner field
-                      _buildInfoRow('Owner', _animal!.ownerId ?? '', null),
-                      const SizedBox(height: 8),
-                      
-                      // Gender with icon (make editable)
-                      _buildEditableField(
-                        'Gender',
-                        _animal!.sex,
-                        (value) => _updateAnimalField('sex', value),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Species (editable)
-                      _buildEditableField(
-                        'Species',
-                        _animal!.species,
-                        (value) => _updateAnimalField('species', value),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Breed (editable)
-                      _buildEditableField(
-                        'Breed',
-                        _animal!.breed ?? '',
-                        (value) => _updateAnimalField('breed', value),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Repro status (editable)
-                      _buildEditableField(
-                        'Repro',
-                        _animal!.reproductiveStatus ?? 'Unknown',
-                        (value) => _updateAnimalField('reproductiveStatus', value),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Age (editable)
-                      _buildEditableField(
-                        'Age',
-                        _getAgeDisplay(),
-                        (value) => _updateAnimalField('estimatedAge', int.tryParse(value) ?? 0),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Size (editable)
-                      _buildEditableField(
-                        'Size',
-                        _animal!.size ?? 'Unknown',
-                        (value) => _updateAnimalField('size', value),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Weight (editable)
-                      _buildEditableField(
-                        'Weight(kg)',
-                        _animal!.weight?.toString() ?? '',
-                        (value) => _updateAnimalField('weight', double.tryParse(value) ?? 0.0),
-                        keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Microchip (editable)
-                      _buildEditableField(
-                        'MC',
-                        _animal!.microchipNumber ?? '',
-                        (value) => _updateAnimalField('microchipNumber', value),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Registration
-                      _buildInfoRow('Registration', _formatDate(_animal!.registrationDate), null),
-                      const SizedBox(height: 8),
-                      
-                      // Colour (editable)
-                      _buildEditableField(
-                        'Colour',
-                        _animal!.color ?? '',
-                        (value) => _updateAnimalField('color', value),
-                      ),
-                    ],
+                  child: Form(
+                    key: _formKey,
+                    child: _buildAnimalForm(),
                   ),
                 ),
               ),
             ),
           ),
+          
+          // Photo Gallery
+          if (_photoSyncServiceReady && _animal != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Photos',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        AnimalPhotoGallery(
+                          animalId: _animal!.id,
+                          existingPhotos: _photoUrls,
+                          photoSyncService: _photoSyncService!,
+                          onPhotoListChanged: (updatedList) {
+                            setState(() {
+                              _photoUrls = List<String>.from(updatedList.map((p) => p.split('/').last));
+                            });
+                            
+                            // If not in edit mode, save immediately
+                            if (!_isEditMode && _animal != null) {
+                              final updatedAnimal = _animal!.copyWith(
+                                photoUrls: _photoUrls,
+                                lastUpdated: DateTime.now(),
+                              );
+                              setState(() {
+                                _animal = updatedAnimal;
+                              });
+                              // Update in database
+                              ref.read(animalsProvider.notifier).updateAnimal(updatedAnimal);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           
           // Record Actions
           SliverToBoxAdapter(

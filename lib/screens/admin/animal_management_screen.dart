@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:amrric_app/services/auth_service.dart';
 import 'package:amrric_app/services/animal_service.dart';
 import 'package:amrric_app/utils/permission_helper.dart';
+import 'package:amrric_app/screens/animal_detail_screen.dart';
 import 'package:amrric_app/screens/admin/animal_form_screen.dart';
 import 'package:amrric_app/models/animal.dart';
 import 'package:amrric_app/models/user.dart';
@@ -513,12 +514,14 @@ class _AnimalManagementScreenState extends ConsumerState<AnimalManagementScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AnimalFormScreen(animal: animal),
+        builder: (context) => AnimalDetailScreen(
+          animalId: animal.id,
+          animalName: animal.name ?? 'Unknown',
+        ),
       ),
-    ).then((result) {
-      if (result == true) {
-        _loadAnimals();
-      }
+    ).then((_) {
+      // Always reload animals when returning from detail screen
+      _loadAnimals();
     });
   }
 
